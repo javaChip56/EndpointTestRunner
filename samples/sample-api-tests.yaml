@@ -1,0 +1,84 @@
+environments:
+  - name: Local
+    baseUrl: http://localhost:5005
+    endpoints:
+      - name: Login
+        method: POST
+        path: /sample-api/auth/login
+        headers:
+          Content-Type: application/json
+          X-Test-Source: sample-suite
+        body:
+          username: testuser
+          password: password123
+        tests:
+          - name: Login should succeed
+            expectedStatus: 200
+            assertions:
+              - field: success
+                equals: true
+              - field: message
+                containsText: success
+              - field: data.token
+                type: string
+                notEmpty: true
+              - field: data.user
+                type: object
+
+      - name: Get Accounts
+        method: GET
+        path: /sample-api/accounts
+        query:
+          customerId: C1001
+          page: 1
+          pageSize: 50
+        tests:
+          - name: Accounts should exist
+            expectedStatus: 200
+            assertions:
+              - field: data.accounts
+                type: array
+                minCount: 1
+              - field: data.accounts
+                contains:
+                  status: Active
+              - field: data.accounts[0].accountNo
+                startsWith: ACC-
+              - field: data.request.customerId
+                equals: C1001
+
+      - name: Get Customer Details
+        method: GET
+        path: /sample-api/customers/{customerId}
+        pathParams:
+          customerId: C1001
+        tests:
+          - name: Customer profile should include tags
+            expectedStatus: 200
+            assertions:
+              - field: data.customer
+                type: object
+              - field: data.customer.name
+                equals: Ada Lovelace
+              - field: data.customer.tags
+                type: array
+                count: 2
+              - field: data.customer.profile.locale
+                endsWith: SG
+
+  - name: Local Canary
+    baseUrl: http://localhost:5005
+    endpoints:
+      - name: Health Check
+        method: GET
+        path: /sample-api/health
+        tests:
+          - name: Health endpoint should be healthy
+            expectedStatus: 200
+            assertions:
+              - field: success
+                equals: true
+              - field: message
+                equals: healthy
+              - field: data
+                type: object
