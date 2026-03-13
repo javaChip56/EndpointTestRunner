@@ -1,0 +1,17 @@
+targetEnvironments:
+  - Local Canary
+
+endpoints:
+  - name: Health Check
+    method: GET
+    path: /sample-api/health
+    tests:
+      - name: Health endpoint should be healthy
+        expectedStatus: 200
+        assertions:
+          - field: success
+            equals: true
+          - field: message
+            equals: healthy
+          - field: data
+            type: object

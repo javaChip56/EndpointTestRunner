@@ -31,4 +31,9 @@ D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.App\obj\Release\net8.0
 D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.App\obj\Release\net8.0\ApiTestRunner.App.pdb
 D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.App\obj\Release\net8.0\ApiTestRunner.App.genruntimeconfig.cache
 D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.App\obj\Release\net8.0\ref\ApiTestRunner.App.dll
-D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.App\bin\Release\net8.0\Samples\sample-api-tests.yaml
+D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.App\bin\Release\net8.0\Samples\Endpoints\accounts\get-accounts.yaml
+D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.App\bin\Release\net8.0\Samples\Endpoints\auth\login.yaml
+D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.App\bin\Release\net8.0\Samples\Endpoints\customers\get-customer-details.yaml
+D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.App\bin\Release\net8.0\Samples\Endpoints\health\health-check.yaml
+D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.App\bin\Release\net8.0\Samples\Environments\sample-api.yaml
+D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.App\obj\Release\net8.0\ApiTestRunner.App.sourcelink.json

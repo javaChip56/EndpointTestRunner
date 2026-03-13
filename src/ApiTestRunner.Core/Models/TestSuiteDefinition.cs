@@ -2,12 +2,21 @@ using YamlDotNet.Serialization;
 
 namespace ApiTestRunner.Core.Models;
 
-public sealed class ApiTestSuiteDefinition
+public sealed record class ApiTestSuiteDefinition
 {
     public List<EnvironmentDefinition> Environments { get; init; } = [];
 }
 
-public sealed class EnvironmentDefinition
+public sealed record class ApiTestDocumentDefinition
+{
+    public List<EnvironmentDefinition> Environments { get; init; } = [];
+
+    public List<EndpointDefinition> Endpoints { get; init; } = [];
+
+    public List<string> TargetEnvironments { get; init; } = [];
+}
+
+public sealed record class EnvironmentDefinition
 {
     public string Name { get; init; } = string.Empty;
 
@@ -16,7 +25,7 @@ public sealed class EnvironmentDefinition
     public List<EndpointDefinition> Endpoints { get; init; } = [];
 }
 
-public sealed class EndpointDefinition
+public sealed record class EndpointDefinition
 {
     public string Name { get; init; } = string.Empty;
 
@@ -35,7 +44,7 @@ public sealed class EndpointDefinition
     public List<TestDefinition> Tests { get; init; } = [];
 }
 
-public sealed class TestDefinition
+public sealed record class TestDefinition
 {
     public string Name { get; init; } = string.Empty;
 
@@ -44,7 +53,7 @@ public sealed class TestDefinition
     public List<AssertionDefinition> Assertions { get; init; } = [];
 }
 
-public sealed class AssertionDefinition
+public sealed record class AssertionDefinition
 {
     public string Field { get; init; } = string.Empty;
 

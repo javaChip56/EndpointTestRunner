@@ -10,3 +10,4 @@ D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.Core\obj\Release\net8.
 D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.Core\obj\Release\net8.0\refint\ApiTestRunner.Core.dll
 D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.Core\obj\Release\net8.0\ApiTestRunner.Core.pdb
 D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.Core\obj\Release\net8.0\ref\ApiTestRunner.Core.dll
+D:\Projects\Research\EndpointTestRunner\src\ApiTestRunner.Core\obj\Release\net8.0\ApiTestRunner.Core.sourcelink.json

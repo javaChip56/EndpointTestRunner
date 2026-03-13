@@ -1,0 +1,25 @@
+targetEnvironments:
+  - Local
+
+endpoints:
+  - name: Get Accounts
+    method: GET
+    path: /sample-api/accounts
+    query:
+      customerId: C1001
+      page: 1
+      pageSize: 50
+    tests:
+      - name: Accounts should exist
+        expectedStatus: 200
+        assertions:
+          - field: data.accounts
+            type: array
+            minCount: 1
+          - field: data.accounts
+            contains:
+              status: Active
+          - field: data.accounts[0].accountNo
+            startsWith: ACC-
+          - field: data.request.customerId
+            equals: C1001

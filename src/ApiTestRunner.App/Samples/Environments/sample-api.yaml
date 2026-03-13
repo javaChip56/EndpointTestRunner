@@ -1,0 +1,6 @@
+environments:
+  - name: Local
+    baseUrl: http://localhost:5005
+
+  - name: Local Canary
+    baseUrl: http://localhost:5005

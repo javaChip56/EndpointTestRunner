@@ -5,33 +5,40 @@
 ## Project structure
 
 - `src/ApiTestRunner.App` hosts the executable, dashboard UI, sample APIs, configuration, and startup automation.
-- `src/ApiTestRunner.Core` contains YAML loading, HTTP execution, JSON assertion evaluation, and result models.
-- `samples/sample-api-tests.yaml` is a runnable sample suite that targets the embedded sample API.
+- `src/ApiTestRunner.Core` contains YAML loading, HTTP execution, JSON assertion evaluation, merge logic, and result models.
+- `src/ApiTestRunner.App/Samples` contains the runnable split-file sample suite used by the app.
+- `samples` mirrors the split sample structure at the repository root for easier browsing.
 
 ## Features
 
 - Multiple environments in YAML
 - Multiple endpoints per base URL
+- One YAML file per endpoint when preferred
+- Shared environment definition files
+- Exact file paths, directories, and glob patterns in `Execution.TestFiles`
 - Path params, query params, headers, and JSON request bodies
 - Dot-notation assertions with array index support
 - Validation for strings, objects, and arrays
 - Pass/fail reporting with response previews in the dashboard
 - Configurable dashboard host, port, browser auto-launch, suite files, and concurrency through `appsettings.json`
 
-## Requirements
+## Requirements summary
 
-- .NET SDK 8.0 or later
+- The runner loads YAML definitions, builds HTTP requests with `HttpClient`, parses YAML with `YamlDotNet`, evaluates JSON assertions with `System.Text.Json`, and serves a local dashboard with ASP.NET Core.
+- The dashboard host, port, and browser auto-launch behavior come from `appsettings.json`.
+- Multiple environments and multiple endpoints per environment are supported.
+- Assertions can target string, object, and array fields using dot notation and array indexes.
 
 ## Run
 
 From the repository root:
 
 ```powershell
-dotnet restore
-dotnet run --project src/ApiTestRunner.App
+dotnet restore ApiTestRunner.sln
+dotnet run --project src/ApiTestRunner.App -c Release
 ```
 
-The app starts the dashboard at `http://localhost:5005` by default, auto-launches the browser if enabled, and executes the sample suite after the web server is ready.
+The app starts the dashboard at `http://localhost:5005` by default, auto-launches the browser if enabled, and executes the split sample suite after the web server is ready.
 
 ## Configuration
 
@@ -44,34 +51,97 @@ The app starts the dashboard at `http://localhost:5005` by default, auto-launche
 - `Execution.MaxConcurrency`
 - `Execution.HttpTimeoutSeconds`
 
-## YAML shape
+`Execution.TestFiles` accepts:
 
-The supported YAML structure is:
+- Exact file paths
+- Directory paths
+- Glob patterns such as `Samples/Endpoints/**/*.yaml`
+
+Example:
+
+```json
+{
+  "Execution": {
+    "TestFiles": [
+      "Samples/Environments/**/*.yaml",
+      "Samples/Endpoints/**/*.yaml"
+    ]
+  }
+}
+```
+
+## Supported YAML styles
+
+Full suite file:
 
 ```yaml
 environments:
   - name: Local
     baseUrl: http://localhost:5005
     endpoints:
-      - name: Example
+      - name: Get Accounts
         method: GET
-        path: /api/example/{id}
-        pathParams:
-          id: 42
-        query:
-          page: 1
-        headers:
-          Authorization: Bearer token
-        body:
-          sample: true
+        path: /api/accounts
         tests:
-          - name: Should work
+          - name: Accounts should exist
             expectedStatus: 200
-            assertions:
-              - field: data.items[0].name
-                type: string
-                notEmpty: true
 ```
+
+Shared environment file:
+
+```yaml
+environments:
+  - name: Local
+    baseUrl: http://localhost:5005
+  - name: UAT
+    baseUrl: https://uat-api.company.com
+```
+
+Endpoint-only file:
+
+```yaml
+targetEnvironments:
+  - Local
+  - UAT
+
+endpoints:
+  - name: Get Accounts
+    method: GET
+    path: /api/accounts
+    query:
+      customerId: C1001
+    tests:
+      - name: Accounts should exist
+        expectedStatus: 200
+        assertions:
+          - field: data.accounts
+            type: array
+            minCount: 1
+```
+
+If only one environment is defined across all loaded YAML files, `targetEnvironments` can be omitted for endpoint-only files and the endpoint is attached to that single environment automatically.
+
+## Recommended split layout
+
+```text
+Samples/
+  Environments/
+    sample-api.yaml
+  Endpoints/
+    auth/
+      login.yaml
+    accounts/
+      get-accounts.yaml
+    customers/
+      get-customer-details.yaml
+```
+
+## Merge rules
+
+- Environment definitions from different files are merged by environment name.
+- If the same environment name appears with different `baseUrl` values, loading fails fast.
+- Full-suite files and endpoint-only files can be mixed in the same run.
+- Endpoint-only files are attached to the environments named in `targetEnvironments`.
 
 ## Assumptions
 
