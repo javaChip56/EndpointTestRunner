@@ -70,7 +70,7 @@ function renderState(state) {
             const endpointNode = endpointTemplate.content.firstElementChild.cloneNode(true);
             endpointNode.querySelector(".endpoint-name").textContent = endpoint.name;
             endpointNode.querySelector(".endpoint-meta").textContent =
-                `${endpoint.method} ${endpoint.requestUrl} • ${Math.round(endpoint.durationMs)} ms`;
+                `${endpoint.method} ${endpoint.requestUrl} - ${Math.round(endpoint.durationMs)} ms`;
 
             const endpointBadge = endpointNode.querySelector(".endpoint-badge");
             endpointBadge.textContent = endpoint.isSuccess ? "Pass" : "Fail";
@@ -90,7 +90,7 @@ function renderState(state) {
                 testBadge.className = `test-badge ${test.isSuccess ? "passing" : "failing"}`;
 
                 const expectedText = `Expected ${test.expectedStatus}, actual ${test.actualStatus ?? "n/a"}`;
-                const errorSuffix = test.errorMessage ? ` • ${test.errorMessage}` : "";
+                const errorSuffix = test.errorMessage ? ` - ${test.errorMessage}` : "";
                 testNode.querySelector(".test-status-line").textContent = `${expectedText}${errorSuffix}`;
 
                 const assertionList = testNode.querySelector(".assertion-list");

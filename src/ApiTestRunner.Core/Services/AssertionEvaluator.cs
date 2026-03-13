@@ -29,7 +29,23 @@ public sealed class AssertionEvaluator : IAssertionEvaluator
         JsonNode? responseJson,
         ICollection<AssertionResult> results)
     {
-        var hasValue = JsonFieldNavigator.TryGetNode(responseJson, assertion.Field, out var actualNode);
+        bool hasValue;
+        JsonNode? actualNode;
+
+        try
+        {
+            hasValue = JsonFieldNavigator.TryGetNode(responseJson, assertion.Field, out actualNode);
+        }
+        catch (FormatException exception)
+        {
+            results.Add(CreateResult(
+                assertion.Field,
+                "field",
+                false,
+                $"Invalid field path: {exception.Message}"));
+            return;
+        }
+
         var rulesAdded = 0;
 
         if (assertion.EqualsValue is not null)

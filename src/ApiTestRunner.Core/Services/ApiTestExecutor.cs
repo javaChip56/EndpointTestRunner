@@ -11,6 +11,15 @@ namespace ApiTestRunner.Core.Services;
 
 public sealed class ApiTestExecutor : IApiTestExecutor
 {
+    private static readonly HashSet<string> SupportedMethods = new(StringComparer.OrdinalIgnoreCase)
+    {
+        HttpMethod.Get.Method,
+        HttpMethod.Post.Method,
+        HttpMethod.Put.Method,
+        HttpMethod.Patch.Method,
+        HttpMethod.Delete.Method
+    };
+
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
@@ -96,14 +105,21 @@ public sealed class ApiTestExecutor : IApiTestExecutor
     {
         var stopwatch = Stopwatch.StartNew();
         var requestUrl = string.Empty;
+        string? requestBody = null;
         string? responseBody = null;
         int? actualStatus = null;
 
         try
         {
-            using var request = BuildRequest(environment, endpoint, out requestUrl);
+            using var request = BuildRequest(environment, endpoint, out requestUrl, out requestBody);
 
             _logger.LogInformation("Executing {Method} {Url}", request.Method.Method, requestUrl);
+            _logger.LogDebug(
+                "Request details for {Method} {Url}. Headers: {Headers}. Body: {Body}",
+                request.Method.Method,
+                requestUrl,
+                FormatHeaders(request),
+                requestBody ?? "(empty)");
 
             using var response = await _httpClient.SendAsync(request, cancellationToken);
             actualStatus = (int)response.StatusCode;
@@ -211,11 +227,19 @@ public sealed class ApiTestExecutor : IApiTestExecutor
     private static HttpRequestMessage BuildRequest(
         EnvironmentDefinition environment,
         EndpointDefinition endpoint,
-        out string requestUrl)
+        out string requestUrl,
+        out string? requestBody)
     {
         if (!Uri.TryCreate(environment.BaseUrl, UriKind.Absolute, out var baseUri))
         {
             throw new InvalidOperationException($"Environment '{environment.Name}' has an invalid baseUrl: {environment.BaseUrl}");
+        }
+
+        var normalizedMethod = endpoint.Method.ToUpperInvariant();
+        if (!SupportedMethods.Contains(normalizedMethod))
+        {
+            throw new InvalidOperationException(
+                $"Endpoint '{endpoint.Name}' uses unsupported HTTP method '{endpoint.Method}'. Supported methods: GET, POST, PUT, PATCH, DELETE.");
         }
 
         var resolvedPath = ResolvePath(endpoint.Path, endpoint.PathParams);
@@ -237,13 +261,14 @@ public sealed class ApiTestExecutor : IApiTestExecutor
             requestUrl = combinedUri.ToString();
         }
 
-        var method = new HttpMethod(endpoint.Method.ToUpperInvariant());
+        var method = new HttpMethod(normalizedMethod);
         var request = new HttpRequestMessage(method, requestUrl);
+        requestBody = null;
 
         if (endpoint.Body is not null)
         {
-            var jsonBody = JsonNodeConversion.ToJsonNode(endpoint.Body)?.ToJsonString(SerializerOptions) ?? "null";
-            request.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+            requestBody = JsonNodeConversion.ToJsonNode(endpoint.Body)?.ToJsonString(SerializerOptions) ?? "null";
+            request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
         }
 
         foreach (var header in endpoint.Headers)
@@ -281,5 +306,14 @@ public sealed class ApiTestExecutor : IApiTestExecutor
             IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty,
             _ => JsonSerializer.Serialize(value, SerializerOptions)
         };
+    }
+
+    private static string FormatHeaders(HttpRequestMessage request)
+    {
+        var headerPairs = request.Headers.Select(header => $"{header.Key}={string.Join("|", header.Value)}");
+        var contentHeaderPairs = request.Content?.Headers.Select(header => $"{header.Key}={string.Join("|", header.Value)}")
+            ?? Enumerable.Empty<string>();
+
+        return string.Join(", ", headerPairs.Concat(contentHeaderPairs));
     }
 }
