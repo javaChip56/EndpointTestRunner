@@ -121,6 +121,53 @@ endpoints:
 
 If only one environment is defined across all loaded YAML files, `targetEnvironments` can be omitted for endpoint-only files and the endpoint is attached to that single environment automatically.
 
+## Supported assertion keywords
+
+The runner currently supports these assertion keys:
+
+- `equals`
+- `notEquals`
+- `type`
+- `containsText`
+- `startsWith`
+- `endsWith`
+- `notEmpty`
+- `minCount`
+- `maxCount`
+- `count`
+- `contains`
+
+Supported `type` values:
+
+- `string`
+- `number`
+- `boolean`
+- `object`
+- `array`
+
+Example:
+
+```yaml
+assertions:
+  - field: success
+    equals: true
+
+  - field: message
+    containsText: success
+
+  - field: data.token
+    type: string
+    notEmpty: true
+
+  - field: data.accounts
+    type: array
+    minCount: 1
+
+  - field: data.accounts
+    contains:
+      status: Active
+```
+
 ## Recommended split layout
 
 ```text
