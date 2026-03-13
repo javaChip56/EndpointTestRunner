@@ -40,6 +40,23 @@ dotnet run --project src/ApiTestRunner.App -c Release
 
 The app starts the dashboard at `http://localhost:5005` by default, auto-launches the browser if enabled, and executes the split sample suite after the web server is ready.
 
+## CI/CD
+
+The repository now includes a GitHub Actions based CI/CD setup under [`.github/workflows`](D:/Projects/Research/EndpointTestRunner/.github/workflows):
+
+- `ci.yml` restores, builds, runs automated tests, and uploads test results plus coverage output.
+- `sast.yml` runs GitHub CodeQL for static application security testing.
+- `release.yml` validates the solution, publishes self-contained release builds for `win-x64` and `linux-x64`, and attaches zip artifacts to GitHub releases for tags matching `v*`.
+
+Release examples:
+
+- `v1.0.0`
+- `v1.1.0`
+
+Assumption:
+
+- The CI/CD platform is GitHub Actions. If you need Azure DevOps, GitLab CI, or Jenkins instead, the same stages can be ported.
+
 ## Configuration
 
 `src/ApiTestRunner.App/appsettings.json` controls:
