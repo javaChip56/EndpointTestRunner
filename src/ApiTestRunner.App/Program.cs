@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using ApiTestRunner.App.Models;
 using ApiTestRunner.App.Options;
 using ApiTestRunner.App.Services;
 using ApiTestRunner.Core.Extensions;
@@ -17,6 +18,8 @@ builder.Services.Configure<WebServerOptions>(builder.Configuration.GetSection(We
 builder.Services.Configure<ExecutionOptions>(builder.Configuration.GetSection(ExecutionOptions.SectionName));
 
 builder.Services.AddApiTestRunnerCore();
+builder.Services.AddSingleton<IConfiguredTestSuiteProvider, ConfiguredTestSuiteProvider>();
+builder.Services.AddSingleton<ICurlCommandAnalyzer, CurlCommandAnalyzer>();
 builder.Services.AddSingleton<TestRunCoordinator>();
 builder.Services.AddHostedService<StartupAutomationHostedService>();
 
@@ -36,9 +39,25 @@ app.MapGet("/api/dashboard/state", (TestRunCoordinator coordinator) =>
     return Results.Ok(coordinator.GetState());
 });
 
-app.MapPost("/api/dashboard/run", async (TestRunCoordinator coordinator, CancellationToken cancellationToken) =>
+app.MapGet("/api/dashboard/manifest", async (TestRunCoordinator coordinator, CancellationToken cancellationToken) =>
 {
-    var result = await coordinator.ExecuteAsync(cancellationToken);
+    var manifest = await coordinator.GetManifestAsync(cancellationToken);
+    return Results.Ok(manifest);
+});
+
+app.MapPost("/api/dashboard/run", async (HttpRequest request, TestRunCoordinator coordinator, CancellationToken cancellationToken) =>
+{
+    var selection = request.ContentLength > 0
+        ? await request.ReadFromJsonAsync<TestSelectionRequest>(cancellationToken)
+        : null;
+
+    var result = await coordinator.ExecuteAsync(selection, cancellationToken);
+    return Results.Ok(result);
+});
+
+app.MapPost("/api/tools/curl/analyze", async (CurlAnalyzeRequest request, ICurlCommandAnalyzer analyzer, CancellationToken cancellationToken) =>
+{
+    var result = await analyzer.AnalyzeAsync(request, cancellationToken);
     return Results.Ok(result);
 });
 

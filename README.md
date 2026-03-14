@@ -19,7 +19,9 @@
 - Path params, query params, headers, and JSON request bodies
 - Dot-notation assertions with array index support
 - Validation for strings, objects, and arrays
+- Toggleable test selection in the dashboard, including select-all and individual test control
 - Pass/fail reporting with response previews in the dashboard
+- cURL analysis page that scans configured YAML definitions and generates suggested environment and endpoint YAML when missing
 - Configurable dashboard host, port, browser auto-launch, suite files, and concurrency through `appsettings.json`
 
 ## Requirements summary
@@ -39,6 +41,36 @@ dotnet run --project src/ApiTestRunner.App -c Release
 ```
 
 The app starts the dashboard at `http://localhost:5005` by default, auto-launches the browser if enabled, and executes the split sample suite after the web server is ready.
+
+## Dashboard workflow
+
+The main dashboard now exposes a test-selection panel before execution:
+
+- `Select All` enables the full suite.
+- `Clear All` disables every test.
+- Environment, endpoint, and individual test checkboxes let you run only the subset you care about.
+- Each page load starts with all tests selected by default.
+
+Important note:
+
+- The runner still executes one HTTP request per endpoint. Selecting one test under an endpoint will run that endpoint once and evaluate only the selected tests against that shared response.
+
+## cURL import workflow
+
+Open `http://localhost:5005/curl-import.html` to paste a cURL command and inspect it.
+
+The tool will:
+
+- parse the request URL, method, headers, query string, and JSON body
+- scan the configured YAML suite for an existing environment with the same base URL
+- scan for an existing endpoint with the same method and either the same path or a matching path template such as `/customers/{customerId}`
+- generate suggested environment YAML when the base URL is not already present
+- generate suggested endpoint YAML when the endpoint is not already present
+
+Current first-version scope:
+
+- best support is for common `curl`, `-X`, `-H`, `--data`, `--data-raw`, `--data-binary`, and `--url` forms
+- generated YAML is shown as preview text, not written directly to disk
 
 ## CI/CD
 

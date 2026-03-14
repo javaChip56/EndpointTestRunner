@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>API Test Runner - cURL Import</title>
+    <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero">
+            <div>
+                <p class="eyebrow">Generator tool</p>
+                <h1>cURL analyzer and YAML generator</h1>
+                <p class="subtitle">Paste a cURL command to check whether the environment and endpoint already exist in the loaded YAML suite, then generate suggested YAML when they do not.</p>
+                <nav class="page-nav">
+                    <a href="/index.html" class="nav-link">Dashboard</a>
+                    <a href="/curl-import.html" class="nav-link nav-link-active">cURL Import</a>
+                </nav>
+            </div>
+        </header>
+
+        <section class="tool-panel">
+            <div class="tool-header">
+                <div>
+                    <h2>Paste cURL command</h2>
+                    <p class="helper-text">The first version focuses on common `curl`, `-X`, `-H`, `--data`, `--data-raw`, and `--url` patterns.</p>
+                </div>
+            </div>
+
+            <textarea id="curlInput" class="tool-input" spellcheck="false" placeholder="curl --location --request POST 'https://api.example.com/accounts?customerId=C1001' --header 'Content-Type: application/json' --data '{&quot;page&quot;:1}'"></textarea>
+
+            <div class="tool-actions">
+                <button id="analyzeButton" class="primary-button" type="button">Analyze Command</button>
+                <span id="analyzeStatus" class="result-summary">Waiting for input.</span>
+            </div>
+        </section>
+
+        <section id="analysisContainer" class="tool-output-grid"></section>
+    </div>
+
+    <script src="/curl-import.js"></script>
+</body>
+</html>

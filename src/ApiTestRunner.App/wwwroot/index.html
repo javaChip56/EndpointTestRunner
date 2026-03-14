@@ -13,12 +13,32 @@
                 <p class="eyebrow">Embedded dashboard</p>
                 <h1>YAML-driven API test runner</h1>
                 <p class="subtitle">Runs the configured suite, evaluates JSON assertions, and keeps the latest pass/fail snapshot local.</p>
+                <nav class="page-nav">
+                    <a href="/index.html" class="nav-link nav-link-active">Dashboard</a>
+                    <a href="/curl-import.html" class="nav-link">cURL Import</a>
+                </nav>
             </div>
             <div class="hero-actions">
                 <button id="runButton" class="primary-button">Run Tests</button>
                 <button id="refreshButton" class="ghost-button">Refresh</button>
             </div>
         </header>
+
+        <section class="selection-panel">
+            <div class="selection-header">
+                <div>
+                    <h2>Test selection</h2>
+                    <p id="selectionSummary" class="selection-summary">Loading test manifest...</p>
+                </div>
+                <div class="selection-actions">
+                    <button id="selectAllButton" class="ghost-button" type="button">Select All</button>
+                    <button id="clearAllButton" class="ghost-button" type="button">Clear All</button>
+                    <button id="expandSelectionButton" class="ghost-button" type="button">Expand All</button>
+                    <button id="collapseSelectionButton" class="ghost-button" type="button">Collapse All</button>
+                </div>
+            </div>
+            <div id="selectionContainer" class="selection-tree"></div>
+        </section>
 
         <section class="summary-grid" id="summaryGrid">
             <article class="summary-card">
@@ -50,48 +70,74 @@
             </div>
         </section>
 
+        <section class="results-panel">
+            <div class="selection-header">
+                <div>
+                    <h2>Test results</h2>
+                    <p id="resultsSummary" class="result-summary">Use the controls to expand or collapse the latest results.</p>
+                </div>
+                <div class="selection-actions">
+                    <button id="expandResultsButton" class="ghost-button" type="button">Expand All</button>
+                    <button id="collapseResultsButton" class="ghost-button" type="button">Collapse All</button>
+                </div>
+            </div>
+        </section>
+
         <main id="environmentContainer" class="environment-container"></main>
     </div>
 
     <template id="environmentTemplate">
-        <section class="environment-card">
-            <header class="environment-header">
-                <div>
-                    <h3 class="environment-name"></h3>
-                    <p class="environment-url"></p>
-                </div>
-                <span class="environment-badge"></span>
-            </header>
-            <div class="endpoint-list"></div>
-        </section>
+        <details class="environment-card">
+            <summary class="environment-summary-row">
+                <header class="environment-header">
+                    <div>
+                        <h3 class="environment-name"></h3>
+                        <p class="environment-url"></p>
+                        <p class="environment-stats"></p>
+                    </div>
+                    <span class="environment-badge"></span>
+                </header>
+            </summary>
+            <div class="environment-details">
+                <div class="endpoint-list"></div>
+            </div>
+        </details>
     </template>
 
     <template id="endpointTemplate">
-        <article class="endpoint-card">
-            <header class="endpoint-header">
-                <div>
-                    <h4 class="endpoint-name"></h4>
-                    <p class="endpoint-meta"></p>
-                </div>
-                <span class="endpoint-badge"></span>
-            </header>
-            <div class="test-list"></div>
-            <details class="response-panel">
-                <summary>Response preview</summary>
-                <pre class="response-body"></pre>
-            </details>
-        </article>
+        <details class="endpoint-card">
+            <summary class="endpoint-summary-row">
+                <header class="endpoint-header">
+                    <div>
+                        <h4 class="endpoint-name"></h4>
+                        <p class="endpoint-meta"></p>
+                    </div>
+                    <span class="endpoint-badge"></span>
+                </header>
+            </summary>
+            <div class="endpoint-details">
+                <div class="test-list"></div>
+                <details class="response-panel">
+                    <summary>Response preview</summary>
+                    <pre class="response-body"></pre>
+                </details>
+            </div>
+        </details>
     </template>
 
     <template id="testTemplate">
-        <section class="test-card">
-            <div class="test-title-row">
-                <strong class="test-name"></strong>
-                <span class="test-badge"></span>
+        <details class="test-card">
+            <summary class="test-summary-row">
+                <div class="test-title-row">
+                    <strong class="test-name"></strong>
+                    <span class="test-badge"></span>
+                </div>
+                <p class="test-status-line"></p>
+            </summary>
+            <div class="test-details">
+                <ul class="assertion-list"></ul>
             </div>
-            <p class="test-status-line"></p>
-            <ul class="assertion-list"></ul>
-        </section>
+        </details>
     </template>
 
     <script src="/app.js"></script>
