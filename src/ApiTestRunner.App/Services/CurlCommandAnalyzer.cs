@@ -1,11 +1,12 @@
+using System.Collections;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using ApiTestRunner.App.Models;
 using ApiTestRunner.Core.Models;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
+using YamlDotNet.Core;
+using YamlDotNet.RepresentationModel;
 
 namespace ApiTestRunner.App.Services;
 
@@ -19,15 +20,10 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
     };
 
     private readonly IConfiguredTestSuiteProvider _suiteProvider;
-    private readonly ISerializer _yamlSerializer;
 
     public CurlCommandAnalyzer(IConfiguredTestSuiteProvider suiteProvider)
     {
         _suiteProvider = suiteProvider;
-        _yamlSerializer = new SerializerBuilder()
-            .WithNamingConvention(CamelCaseNamingConvention.Instance)
-            .ConfigureDefaultValuesHandling(DefaultValuesHandling.OmitNull)
-            .Build();
     }
 
     public async Task<CurlAnalyzeResponse> AnalyzeAsync(CurlAnalyzeRequest request, CancellationToken cancellationToken = default)
@@ -564,19 +560,19 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
 
     private string GenerateEnvironmentYaml(string environmentName, string baseUrl)
     {
-        var document = new
+        var document = new Dictionary<string, object?>
         {
-            environments = new[]
+            ["environments"] = new object?[]
             {
-                new
+                new Dictionary<string, object?>
                 {
-                    name = environmentName,
-                    baseUrl
+                    ["name"] = environmentName,
+                    ["baseUrl"] = baseUrl
                 }
             }
         };
 
-        return _yamlSerializer.Serialize(document).Trim();
+        return SerializeYaml(document);
     }
 
     private string GenerateEndpointYaml(
@@ -594,7 +590,7 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
             }
         };
 
-        return _yamlSerializer.Serialize(endpointDocument).Trim();
+        return SerializeYaml(endpointDocument);
     }
 
     private Dictionary<string, object?> BuildEndpointDocument(
@@ -761,6 +757,65 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
                exception is InvalidOperationException invalidOperationException &&
                (invalidOperationException.Message.Contains("did not match any files", StringComparison.OrdinalIgnoreCase) ||
                 invalidOperationException.Message.Contains("No YAML test files were configured", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string SerializeYaml(object value)
+    {
+        var stream = new YamlStream(new YamlDocument(BuildYamlNode(value, isKey: false)));
+        using var writer = new StringWriter();
+        stream.Save(writer, assignAnchors: false);
+        return writer.ToString().Trim();
+    }
+
+    private static YamlNode BuildYamlNode(object? value, bool isKey)
+    {
+        return value switch
+        {
+            null => new YamlScalarNode("null"),
+            string text => new YamlScalarNode(text)
+            {
+                Style = isKey ? ScalarStyle.Plain : ScalarStyle.DoubleQuoted
+            },
+            bool boolean => new YamlScalarNode(boolean ? "true" : "false"),
+            sbyte or byte or short or ushort or int or uint or long or ulong or float or double or decimal
+                => new YamlScalarNode(Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture)),
+            IDictionary<string, object?> dictionary => BuildMappingNode(dictionary),
+            IEnumerable<object?> sequence => BuildSequenceNode(sequence),
+            IEnumerable sequence when value is not string => BuildSequenceNode(sequence.Cast<object?>()),
+            _ => new YamlScalarNode(Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture))
+            {
+                Style = ScalarStyle.DoubleQuoted
+            }
+        };
+    }
+
+    private static YamlMappingNode BuildMappingNode(IEnumerable<KeyValuePair<string, object?>> values)
+    {
+        var mappingNode = new YamlMappingNode();
+
+        foreach (var pair in values)
+        {
+            if (pair.Value is null)
+            {
+                continue;
+            }
+
+            mappingNode.Add(BuildYamlNode(pair.Key, isKey: true), BuildYamlNode(pair.Value, isKey: false));
+        }
+
+        return mappingNode;
+    }
+
+    private static YamlSequenceNode BuildSequenceNode(IEnumerable<object?> values)
+    {
+        var sequenceNode = new YamlSequenceNode();
+
+        foreach (var item in values)
+        {
+            sequenceNode.Add(BuildYamlNode(item, isKey: false));
+        }
+
+        return sequenceNode;
     }
 
     private sealed record EnvironmentMatch(EnvironmentDefinition Environment, string RelativePath);

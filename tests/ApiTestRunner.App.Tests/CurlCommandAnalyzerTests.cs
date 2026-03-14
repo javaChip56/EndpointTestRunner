@@ -99,10 +99,10 @@ public sealed class CurlCommandAnalyzerTests
         Assert.False(result.Environment.Exists);
         Assert.False(result.Endpoint.Exists);
         Assert.NotNull(result.Environment.SuggestedYaml);
-        Assert.Contains("baseUrl: https://api.partner.com", result.Environment.SuggestedYaml);
+        Assert.Contains("baseUrl: \"https://api.partner.com\"", result.Environment.SuggestedYaml);
         Assert.NotNull(result.Endpoint.SuggestedYaml);
-        Assert.Contains("path: /AccountHoldingsMgmt/GetAccountList", result.Endpoint.SuggestedYaml);
-        Assert.Contains("baseCurrency: SGD", result.Endpoint.SuggestedYaml);
+        Assert.Contains("path: \"/AccountHoldingsMgmt/GetAccountList\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("baseCurrency: \"SGD\"", result.Endpoint.SuggestedYaml);
         Assert.Contains("currentPageNumber: 1", result.Endpoint.SuggestedYaml);
     }
 
@@ -141,9 +141,9 @@ public sealed class CurlCommandAnalyzerTests
         });
 
         Assert.NotNull(result.Endpoint.SuggestedYaml);
-        Assert.Contains("field: statusCode", result.Endpoint.SuggestedYaml);
+        Assert.Contains("field: \"statusCode\"", result.Endpoint.SuggestedYaml);
         Assert.Contains("equals: 1", result.Endpoint.SuggestedYaml);
-        Assert.Contains("field: data.pagenationTemplate.dataLists", result.Endpoint.SuggestedYaml);
+        Assert.Contains("field: \"data.pagenationTemplate.dataLists\"", result.Endpoint.SuggestedYaml);
         Assert.Contains("minCount: 1", result.Endpoint.SuggestedYaml);
         Assert.Contains("notEmpty: true", result.Endpoint.SuggestedYaml);
     }
@@ -165,6 +165,29 @@ public sealed class CurlCommandAnalyzerTests
         Assert.False(result.Endpoint.Exists);
         Assert.NotNull(result.Environment.SuggestedYaml);
         Assert.NotNull(result.Endpoint.SuggestedYaml);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_PreservesNumericLookingStringsInGeneratedYaml()
+    {
+        var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
+        {
+            Environments = []
+        }));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            Command = """
+                curl --request POST "https://api.partner.com/AccountHoldingsMgmt/GetAccountList" \
+                  --header "Content-Type: application/json" \
+                  --data "{\"filters\":[{\"column\":\"userRoleID\",\"value\":\"106\",\"filterType\":\"equal\"}]}"
+                """
+        });
+
+        Assert.NotNull(result.Endpoint.SuggestedYaml);
+        Assert.Contains("column: \"userRoleID\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("value: \"106\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("filterType: \"equal\"", result.Endpoint.SuggestedYaml);
     }
 
     private sealed class StubConfiguredTestSuiteProvider : IConfiguredTestSuiteProvider
