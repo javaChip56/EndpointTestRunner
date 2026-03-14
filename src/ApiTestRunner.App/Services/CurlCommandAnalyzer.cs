@@ -38,6 +38,14 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
         var parsedRequest = ParseCurlCommand(request.Command);
         var warnings = new List<string>();
         var loadedSuite = await TryLoadSuiteAsync(warnings, cancellationToken);
+        if (warnings.Count == 0 &&
+            loadedSuite.FilePaths.Count == 0 &&
+            loadedSuite.Suite.Environments.Count == 0)
+        {
+            warnings.Add("Warning: No YAML files were loaded from the configured suite.");
+        }
+
+        var variableSuggestions = BuildVariableSuggestions(parsedRequest);
 
         var matchedEnvironmentInfos = loadedSuite.Suite.Environments
             .Select(environment => TryMatchEnvironment(environment, parsedRequest.Url))
@@ -102,7 +110,7 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
                     : BuildEnvironmentFilePath(suggestedEnvironmentName),
                 SuggestedYaml = matchedEnvironments.Length > 0
                     ? null
-                    : GenerateEnvironmentYaml(suggestedEnvironmentName, parsedRequest.BaseUrl)
+                    : GenerateEnvironmentYaml(suggestedEnvironmentName, parsedRequest.BaseUrl, variableSuggestions.Variables)
             },
             Endpoint = new CurlEndpointAnalysis
             {
@@ -115,10 +123,19 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
                 SuggestedYaml = matchedEndpointEnvironments.Length > 0
                     ? null
                     : GenerateEndpointYaml(
-                        parsedRequest,
+                        variableSuggestions.TransformedRequest,
                         effectivePath,
                         targetEnvironmentNames,
                         request.Assertions)
+            },
+            Variables = new CurlVariableAnalysis
+            {
+                HasSuggestions = variableSuggestions.Variables.Count > 0,
+                VariableNames = variableSuggestions.Variables.Keys.ToArray(),
+                SuggestedYaml = variableSuggestions.Variables.Count == 0
+                    ? null
+                    : GenerateVariablesYaml(variableSuggestions.Variables),
+                IncludedInEnvironmentYaml = matchedEnvironments.Length == 0 && variableSuggestions.Variables.Count > 0
             },
             Warnings = warnings
         };
@@ -132,11 +149,45 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
         {
             return await _suiteProvider.LoadAsync(cancellationToken);
         }
-        catch (Exception exception) when (IsMissingYamlConfigurationException(exception))
+        catch (Exception exception)
         {
             warnings.Add($"Warning: {exception.Message}");
             return new LoadedTestSuite(new ApiTestSuiteDefinition(), []);
         }
+    }
+
+    private VariableSuggestionResult BuildVariableSuggestions(CurlRequestSummary request)
+    {
+        var variables = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        var transformedQuery = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in request.Query)
+        {
+            var variableName = RegisterVariable(variables, SuggestVariableName(pair.Key), pair.Value);
+            transformedQuery[pair.Key] = CreateVariableToken(variableName);
+        }
+
+        var transformedBody = ReplaceBodyScalarsWithVariables(
+            request.Body,
+            variables,
+            pathSegments: [],
+            parentObject: null,
+            currentKey: null);
+
+        var transformedRequest = new CurlRequestSummary
+        {
+            Method = request.Method,
+            Url = request.Url,
+            BaseUrl = request.BaseUrl,
+            Path = request.Path,
+            RelativePath = request.RelativePath,
+            Query = transformedQuery,
+            Headers = request.Headers,
+            Body = transformedBody,
+            RawBody = request.RawBody
+        };
+
+        return new VariableSuggestionResult(variables, transformedRequest);
     }
 
     private static CurlRequestSummary ParseCurlCommand(string command)
@@ -558,7 +609,98 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
         return normalized.Length > 1 ? normalized.TrimEnd('/') : normalized;
     }
 
-    private string GenerateEnvironmentYaml(string environmentName, string baseUrl)
+    private object? ReplaceBodyScalarsWithVariables(
+        object? value,
+        IDictionary<string, object?> variables,
+        IReadOnlyList<string> pathSegments,
+        IReadOnlyDictionary<string, object?>? parentObject,
+        string? currentKey)
+    {
+        switch (value)
+        {
+            case null:
+                return null;
+            case IDictionary<string, object?> dictionary:
+            {
+                var transformed = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var pair in dictionary)
+                {
+                    transformed[pair.Key] = ReplaceBodyScalarsWithVariables(
+                        pair.Value,
+                        variables,
+                        pathSegments.Concat([pair.Key]).ToArray(),
+                        (IReadOnlyDictionary<string, object?>)dictionary,
+                        pair.Key);
+                }
+
+                return transformed;
+            }
+            case IEnumerable<object?> sequence when value is not string:
+            {
+                var items = sequence.ToArray();
+                var transformedItems = new List<object?>(items.Length);
+
+                for (var index = 0; index < items.Length; index++)
+                {
+                    transformedItems.Add(ReplaceBodyScalarsWithVariables(
+                        items[index],
+                        variables,
+                        pathSegments.Concat([$"item{index + 1}"]).ToArray(),
+                        parentObject: null,
+                        currentKey: null));
+                }
+
+                return transformedItems;
+            }
+            case IEnumerable sequence when value is not string:
+            {
+                var items = sequence.Cast<object?>().ToArray();
+                var transformedItems = new List<object?>(items.Length);
+
+                for (var index = 0; index < items.Length; index++)
+                {
+                    transformedItems.Add(ReplaceBodyScalarsWithVariables(
+                        items[index],
+                        variables,
+                        pathSegments.Concat([$"item{index + 1}"]).ToArray(),
+                        parentObject: null,
+                        currentKey: null));
+                }
+
+                return transformedItems;
+            }
+            case string or bool or sbyte or byte or short or ushort or int or uint or long or ulong or float or double or decimal:
+            {
+                if (!ShouldPromoteBodyScalar(currentKey, value))
+                {
+                    return value;
+                }
+
+                var variableName = RegisterVariable(
+                    variables,
+                    SuggestVariableName(pathSegments, parentObject, currentKey),
+                    value);
+
+                return CreateVariableToken(variableName);
+            }
+            default:
+                return value;
+        }
+    }
+
+    private static bool ShouldPromoteBodyScalar(string? currentKey, object? value)
+    {
+        if (value is null)
+        {
+            return false;
+        }
+
+        return !string.Equals(currentKey, "column", StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(currentKey, "filterType", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string GenerateEnvironmentYaml(string environmentName, string baseUrl, IReadOnlyDictionary<string, object?> variables)
     {
         var document = new Dictionary<string, object?>
         {
@@ -567,12 +709,23 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
                 new Dictionary<string, object?>
                 {
                     ["name"] = environmentName,
-                    ["baseUrl"] = baseUrl
+                    ["baseUrl"] = baseUrl,
+                    ["variables"] = variables.Count == 0
+                        ? null
+                        : new Dictionary<string, object?>(variables, StringComparer.OrdinalIgnoreCase)
                 }
             }
         };
 
         return SerializeYaml(document);
+    }
+
+    private string GenerateVariablesYaml(IReadOnlyDictionary<string, object?> variables)
+    {
+        return SerializeYaml(new Dictionary<string, object?>
+        {
+            ["variables"] = new Dictionary<string, object?>(variables, StringComparer.OrdinalIgnoreCase)
+        });
     }
 
     private string GenerateEndpointYaml(
@@ -751,6 +904,92 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
         return string.IsNullOrWhiteSpace(normalized) ? "generated" : normalized;
     }
 
+    private static string RegisterVariable(
+        IDictionary<string, object?> variables,
+        string baseName,
+        object? value)
+    {
+        var normalizedBaseName = string.IsNullOrWhiteSpace(baseName) ? "value" : baseName;
+        var candidate = normalizedBaseName;
+        var suffix = 2;
+
+        while (variables.TryGetValue(candidate, out var existingValue))
+        {
+            if (Equals(existingValue, value))
+            {
+                return candidate;
+            }
+
+            candidate = $"{normalizedBaseName}{suffix}";
+            suffix++;
+        }
+
+        variables[candidate] = value;
+        return candidate;
+    }
+
+    private static string CreateVariableToken(string variableName)
+    {
+        return $"{{{{var:{variableName}}}}}";
+    }
+
+    private static string SuggestVariableName(string key)
+    {
+        return ToCamelCase(key);
+    }
+
+    private static string SuggestVariableName(
+        IReadOnlyList<string> pathSegments,
+        IReadOnlyDictionary<string, object?>? parentObject,
+        string? currentKey)
+    {
+        if (string.Equals(currentKey, "value", StringComparison.OrdinalIgnoreCase) &&
+            parentObject is not null &&
+            parentObject.TryGetValue("column", out var columnValue) &&
+            columnValue is string columnName &&
+            !string.IsNullOrWhiteSpace(columnName))
+        {
+            return ToCamelCase(columnName);
+        }
+
+        var filteredSegments = pathSegments
+            .Where(segment => !string.IsNullOrWhiteSpace(segment))
+            .Where(segment => !segment.StartsWith("item", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        if (filteredSegments.Length == 0)
+        {
+            return "value";
+        }
+
+        return ToCamelCase(string.Join(" ", filteredSegments));
+    }
+
+    private static string ToCamelCase(string value)
+    {
+        var parts = Regex.Matches(value, "[A-Z]?[a-z]+|[A-Z]+(?![a-z])|[0-9]+")
+            .Select(match => match.Value)
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .ToArray();
+
+        if (parts.Length == 0)
+        {
+            return "value";
+        }
+
+        var builder = new StringBuilder();
+        builder.Append(parts[0][..1].ToLowerInvariant());
+        builder.Append(parts[0].Length > 1 ? parts[0][1..] : string.Empty);
+
+        for (var index = 1; index < parts.Length; index++)
+        {
+            builder.Append(parts[index][..1].ToUpperInvariant());
+            builder.Append(parts[index].Length > 1 ? parts[index][1..] : string.Empty);
+        }
+
+        return builder.ToString();
+    }
+
     private static bool IsMissingYamlConfigurationException(Exception exception)
     {
         return exception is FileNotFoundException or DirectoryNotFoundException ||
@@ -819,4 +1058,8 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
     }
 
     private sealed record EnvironmentMatch(EnvironmentDefinition Environment, string RelativePath);
+
+    private sealed record VariableSuggestionResult(
+        IReadOnlyDictionary<string, object?> Variables,
+        CurlRequestSummary TransformedRequest);
 }

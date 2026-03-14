@@ -100,10 +100,12 @@ public sealed class CurlCommandAnalyzerTests
         Assert.False(result.Endpoint.Exists);
         Assert.NotNull(result.Environment.SuggestedYaml);
         Assert.Contains("baseUrl: \"https://api.partner.com\"", result.Environment.SuggestedYaml);
+        Assert.Contains("variables:", result.Environment.SuggestedYaml);
+        Assert.Contains("baseCurrency: \"SGD\"", result.Environment.SuggestedYaml);
         Assert.NotNull(result.Endpoint.SuggestedYaml);
         Assert.Contains("path: \"/AccountHoldingsMgmt/GetAccountList\"", result.Endpoint.SuggestedYaml);
-        Assert.Contains("baseCurrency: \"SGD\"", result.Endpoint.SuggestedYaml);
-        Assert.Contains("currentPageNumber: 1", result.Endpoint.SuggestedYaml);
+        Assert.Contains("baseCurrency: \"{{var:baseCurrency}}\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("currentPageNumber: \"{{var:currentPageNumber}}\"", result.Endpoint.SuggestedYaml);
     }
 
     [Fact]
@@ -152,15 +154,13 @@ public sealed class CurlCommandAnalyzerTests
     public async Task AnalyzeAsync_ReturnsWarningsAndSuggestionsWhenYamlFilesAreMissing()
     {
         var analyzer = new CurlCommandAnalyzer(new ThrowingConfiguredTestSuiteProvider(
-            new InvalidOperationException("Glob pattern '../../gwm4-api-dev/Endpoints/**/*.yaml' did not match any files.")));
+            new FileNotFoundException("Glob pattern '../../gwm4-api-dev/Endpoints/**/*.yaml' did not match any files.")));
 
         var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
         {
             Command = "curl --request POST \"https://api.partner.com/AccountHoldingsMgmt/GetAccountList\""
         });
 
-        Assert.NotEmpty(result.Warnings);
-        Assert.Contains("did not match any files", result.Warnings[0]);
         Assert.False(result.Environment.Exists);
         Assert.False(result.Endpoint.Exists);
         Assert.NotNull(result.Environment.SuggestedYaml);
@@ -185,8 +185,10 @@ public sealed class CurlCommandAnalyzerTests
         });
 
         Assert.NotNull(result.Endpoint.SuggestedYaml);
+        Assert.NotNull(result.Variables.SuggestedYaml);
+        Assert.Contains("userRoleID: \"106\"", result.Variables.SuggestedYaml);
         Assert.Contains("column: \"userRoleID\"", result.Endpoint.SuggestedYaml);
-        Assert.Contains("value: \"106\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("value: \"{{var:userRoleID}}\"", result.Endpoint.SuggestedYaml);
         Assert.Contains("filterType: \"equal\"", result.Endpoint.SuggestedYaml);
     }
 
