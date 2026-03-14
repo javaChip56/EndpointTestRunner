@@ -214,10 +214,9 @@ function createSelectionHeader(title, detail, childTestIds, onToggle) {
     checkbox.checked = childTestIds.every((testId) => selectedTestIds.has(testId));
     checkbox.indeterminate = !checkbox.checked && childTestIds.some((testId) => selectedTestIds.has(testId));
     checkbox.addEventListener("click", (event) => {
-        event.preventDefault();
         event.stopPropagation();
-        onToggle(childTestIds, !checkbox.checked);
     });
+    checkbox.addEventListener("change", () => onToggle(childTestIds, checkbox.checked));
 
     const labelStack = document.createElement("span");
     labelStack.className = "selection-label-stack";
