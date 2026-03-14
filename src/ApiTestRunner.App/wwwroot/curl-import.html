@@ -4,88 +4,166 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>API Test Runner - cURL Import</title>
+    <link rel="stylesheet" href="/lib/fontawesome/css/all.min.css" />
+    <link rel="stylesheet" href="/lib/adminlte/css/adminlte.min.css" />
     <link rel="stylesheet" href="/styles.css" />
 </head>
-<body>
-    <div class="page-shell">
-        <header class="hero">
-            <div>
-                <p class="eyebrow">Generator tool</p>
-                <h1>cURL analyzer and YAML generator</h1>
-                <p class="subtitle">Paste a cURL command to check whether the environment and endpoint already exist in the loaded YAML suite, then generate suggested YAML when they do not.</p>
-                <nav class="page-nav">
-                    <a href="/index.html" class="nav-link">Dashboard</a>
-                    <a href="/curl-import.html" class="nav-link nav-link-active">cURL Import</a>
+<body class="layout-fixed sidebar-expand-lg bg-body-tertiary app-shell">
+    <div class="app-wrapper">
+        <nav class="app-header navbar navbar-expand bg-body">
+            <div class="container-fluid">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button" aria-label="Toggle sidebar">
+                            <i class="fa-solid fa-bars"></i>
+                        </a>
+                    </li>
+                    <li class="nav-item d-none d-md-block">
+                        <span class="nav-link fw-semibold text-body-emphasis">API Test Runner</span>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
+            <div class="sidebar-brand">
+                <a href="/index.html" class="brand-link text-decoration-none">
+                    <span class="brand-image app-brand-icon">
+                        <i class="fa-solid fa-vial-circle-check"></i>
+                    </span>
+                    <span class="brand-text fw-light">API Test Runner</span>
+                </a>
+            </div>
+            <div class="sidebar-wrapper">
+                <nav class="mt-2">
+                    <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu" data-accordion="false">
+                        <li class="nav-item">
+                            <a href="/index.html" class="nav-link">
+                                <i class="nav-icon fa-solid fa-chart-line"></i>
+                                <p>Dashboard</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/curl-import.html" class="nav-link active">
+                                <i class="nav-icon fa-solid fa-terminal"></i>
+                                <p>cURL Import</p>
+                            </a>
+                        </li>
+                    </ul>
                 </nav>
+                <div class="sidebar-note">
+                    <p class="sidebar-note-label">Generator flow</p>
+                    <p class="sidebar-note-value">Paste a request, optionally add a response body, draft assertions, then generate YAML suggestions.</p>
+                </div>
             </div>
-        </header>
+        </aside>
 
-        <section class="tool-panel">
-            <div class="tool-header">
-                <div>
-                    <h2>Paste cURL command</h2>
-                    <p class="helper-text">Paste the request first, then optionally add a response body below. The main action will analyze the request, parse the response JSON, and generate YAML suggestions in one flow.</p>
+        <main class="app-main">
+            <div class="app-content-header">
+                <div class="container-fluid">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                        <div>
+                            <h1 class="content-header-title">cURL analyzer and YAML generator</h1>
+                            <p class="page-subtitle">Check whether the environment and endpoint already exist in the loaded suite, then generate the YAML you still need.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <textarea id="curlInput" class="tool-input" spellcheck="false" placeholder="curl --location --request POST 'https://api.example.com/accounts?customerId=C1001' --header 'Content-Type: application/json' --data '{&quot;page&quot;:1}'"></textarea>
-        </section>
+            <div class="app-content">
+                <div class="container-fluid">
+                    <div class="row g-4">
+                        <div class="col-12">
+                            <section class="card tool-panel">
+                                <div class="card-header border-0">
+                                    <div class="tool-header">
+                                        <div>
+                                            <h2 class="panel-title">Paste cURL command</h2>
+                                            <p class="panel-note mb-0">Paste the request first. The main action below will analyze it and use the optional response body for assertion-driven endpoint YAML.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body pt-0">
+                                    <textarea id="curlInput" class="tool-input" spellcheck="false" placeholder="curl --location --request POST 'https://api.example.com/accounts?customerId=C1001' --header 'Content-Type: application/json' --data '{&quot;page&quot;:1}'"></textarea>
+                                </div>
+                            </section>
+                        </div>
 
-        <section class="tool-panel">
-            <div class="tool-header">
-                <div>
-                    <h2>Paste response body</h2>
-                    <p class="helper-text">Optional. Paste JSON here and the app will parse it automatically when you leave the field or run the analyzer.</p>
+                        <div class="col-12">
+                            <section class="card tool-panel">
+                                <div class="card-header border-0">
+                                    <div class="tool-header">
+                                        <div>
+                                            <h2 class="panel-title">Paste response body</h2>
+                                            <p class="panel-note mb-0">Optional. Paste a JSON response body and the app will parse it automatically when you leave the field or run the generator.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body pt-0">
+                                    <textarea id="responseBodyInput" class="tool-input" spellcheck="false" placeholder="{&quot;statusCode&quot;:1,&quot;data&quot;:{&quot;items&quot;:[1,2,3]}}"></textarea>
+                                    <p id="responseStatus" class="result-summary mb-0">No response body parsed yet.</p>
+                                </div>
+                            </section>
+                        </div>
+
+                        <div class="col-12">
+                            <section class="card tool-panel">
+                                <div class="card-header border-0">
+                                    <div class="tool-header">
+                                        <div>
+                                            <h2 class="panel-title">Assertion builder</h2>
+                                            <p class="panel-note mb-0">Choose a response field, define the rule, and then generate the endpoint YAML preview with those assertions included.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body pt-0">
+                                    <div class="assertion-builder-grid">
+                                        <label class="field-stack">
+                                            <span>Field</span>
+                                            <select id="assertionFieldSelect" class="tool-select"></select>
+                                        </label>
+                                        <label class="field-stack">
+                                            <span>Rule</span>
+                                            <select id="assertionRuleSelect" class="tool-select"></select>
+                                        </label>
+                                        <label id="assertionValueContainer" class="field-stack">
+                                            <span>Value</span>
+                                            <input id="assertionValueInput" class="tool-input-inline" type="text" />
+                                        </label>
+                                    </div>
+
+                                    <div class="tool-actions mt-3">
+                                        <button id="addAssertionButton" class="ghost-button" type="button">Add Assertion</button>
+                                    </div>
+
+                                    <div id="assertionList" class="assertion-draft-list">
+                                        <p class="result-note mb-0">No assertion rules added yet.</p>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+
+                        <div class="col-12">
+                            <section class="card tool-panel">
+                                <div class="card-body">
+                                    <div class="tool-actions">
+                                        <button id="analyzeButton" class="primary-button" type="button">Analyze and Generate</button>
+                                        <span id="analyzeStatus" class="result-summary">Waiting for input.</span>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+
+                        <div class="col-12">
+                            <section id="analysisContainer" class="tool-output-grid"></section>
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <textarea id="responseBodyInput" class="tool-input" spellcheck="false" placeholder="{&quot;statusCode&quot;:1,&quot;data&quot;:{&quot;items&quot;:[1,2,3]}}"></textarea>
-
-            <p id="responseStatus" class="result-summary">No response body parsed yet.</p>
-        </section>
-
-        <section class="tool-panel">
-            <div class="tool-header">
-                <div>
-                    <h2>Assertion builder</h2>
-                    <p class="helper-text">Once the response JSON has been parsed, pick a field, choose how it should be asserted, then run the generator below to append those assertions into the endpoint YAML preview.</p>
-                </div>
-            </div>
-
-            <div class="assertion-builder-grid">
-                <label class="field-stack">
-                    <span>Field</span>
-                    <select id="assertionFieldSelect" class="tool-select"></select>
-                </label>
-                <label class="field-stack">
-                    <span>Rule</span>
-                    <select id="assertionRuleSelect" class="tool-select"></select>
-                </label>
-                <label id="assertionValueContainer" class="field-stack">
-                    <span>Value</span>
-                    <input id="assertionValueInput" class="tool-input-inline" type="text" />
-                </label>
-            </div>
-
-            <div class="tool-actions">
-                <button id="addAssertionButton" class="ghost-button" type="button">Add Assertion</button>
-            </div>
-
-            <div id="assertionList" class="assertion-draft-list">
-                <p class="result-note">No assertion rules added yet.</p>
-            </div>
-        </section>
-
-        <section class="tool-panel">
-            <div class="tool-actions">
-                <button id="analyzeButton" class="primary-button" type="button">Analyze and Generate</button>
-                <span id="analyzeStatus" class="result-summary">Waiting for input.</span>
-            </div>
-        </section>
-
-        <section id="analysisContainer" class="tool-output-grid"></section>
+        </main>
     </div>
 
+    <script src="/lib/adminlte/js/adminlte.min.js"></script>
     <script src="/curl-import.js"></script>
 </body>
 </html>

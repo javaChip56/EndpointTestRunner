@@ -1,0 +1,23 @@
+{
+  "name": "endpointtestrunner",
+  "version": "1.0.0",
+  "description": "`ApiTestRunner` is a production-ready .NET 8 solution for executing YAML-defined API tests and viewing the latest pass/fail snapshot in a local ASP.NET Core dashboard.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/javaChip56/EndpointTestRunner.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/javaChip56/EndpointTestRunner/issues"
+  },
+  "homepage": "https://github.com/javaChip56/EndpointTestRunner#readme"
+}
