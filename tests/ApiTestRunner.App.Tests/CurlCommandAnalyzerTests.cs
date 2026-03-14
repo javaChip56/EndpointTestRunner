@@ -99,11 +99,13 @@ public sealed class CurlCommandAnalyzerTests
         Assert.False(result.Environment.Exists);
         Assert.False(result.Endpoint.Exists);
         Assert.NotNull(result.Environment.SuggestedYaml);
-        Assert.Contains("baseUrl: https://api.partner.com", result.Environment.SuggestedYaml);
+        Assert.Contains("baseUrl: \"https://api.partner.com\"", result.Environment.SuggestedYaml);
+        Assert.Contains("variables:", result.Environment.SuggestedYaml);
+        Assert.Contains("baseCurrency: \"SGD\"", result.Environment.SuggestedYaml);
         Assert.NotNull(result.Endpoint.SuggestedYaml);
-        Assert.Contains("path: /AccountHoldingsMgmt/GetAccountList", result.Endpoint.SuggestedYaml);
-        Assert.Contains("baseCurrency: SGD", result.Endpoint.SuggestedYaml);
-        Assert.Contains("currentPageNumber: 1", result.Endpoint.SuggestedYaml);
+        Assert.Contains("path: \"/AccountHoldingsMgmt/GetAccountList\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("baseCurrency: \"{{var:baseCurrency}}\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("currentPageNumber: \"{{var:currentPageNumber}}\"", result.Endpoint.SuggestedYaml);
     }
 
     [Fact]
@@ -141,11 +143,53 @@ public sealed class CurlCommandAnalyzerTests
         });
 
         Assert.NotNull(result.Endpoint.SuggestedYaml);
-        Assert.Contains("field: statusCode", result.Endpoint.SuggestedYaml);
+        Assert.Contains("field: \"statusCode\"", result.Endpoint.SuggestedYaml);
         Assert.Contains("equals: 1", result.Endpoint.SuggestedYaml);
-        Assert.Contains("field: data.pagenationTemplate.dataLists", result.Endpoint.SuggestedYaml);
+        Assert.Contains("field: \"data.pagenationTemplate.dataLists\"", result.Endpoint.SuggestedYaml);
         Assert.Contains("minCount: 1", result.Endpoint.SuggestedYaml);
         Assert.Contains("notEmpty: true", result.Endpoint.SuggestedYaml);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ReturnsWarningsAndSuggestionsWhenYamlFilesAreMissing()
+    {
+        var analyzer = new CurlCommandAnalyzer(new ThrowingConfiguredTestSuiteProvider(
+            new FileNotFoundException("Glob pattern '../../gwm4-api-dev/Endpoints/**/*.yaml' did not match any files.")));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            Command = "curl --request POST \"https://api.partner.com/AccountHoldingsMgmt/GetAccountList\""
+        });
+
+        Assert.False(result.Environment.Exists);
+        Assert.False(result.Endpoint.Exists);
+        Assert.NotNull(result.Environment.SuggestedYaml);
+        Assert.NotNull(result.Endpoint.SuggestedYaml);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_PreservesNumericLookingStringsInGeneratedYaml()
+    {
+        var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
+        {
+            Environments = []
+        }));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            Command = """
+                curl --request POST "https://api.partner.com/AccountHoldingsMgmt/GetAccountList" \
+                  --header "Content-Type: application/json" \
+                  --data "{\"filters\":[{\"column\":\"userRoleID\",\"value\":\"106\",\"filterType\":\"equal\"}]}"
+                """
+        });
+
+        Assert.NotNull(result.Endpoint.SuggestedYaml);
+        Assert.NotNull(result.Variables.SuggestedYaml);
+        Assert.Contains("userRoleID: \"106\"", result.Variables.SuggestedYaml);
+        Assert.Contains("column: \"userRoleID\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("value: \"{{var:userRoleID}}\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("filterType: \"equal\"", result.Endpoint.SuggestedYaml);
     }
 
     private sealed class StubConfiguredTestSuiteProvider : IConfiguredTestSuiteProvider
@@ -160,6 +204,21 @@ public sealed class CurlCommandAnalyzerTests
         public Task<LoadedTestSuite> LoadAsync(CancellationToken cancellationToken = default)
         {
             return Task.FromResult(new LoadedTestSuite(_suite, []));
+        }
+    }
+
+    private sealed class ThrowingConfiguredTestSuiteProvider : IConfiguredTestSuiteProvider
+    {
+        private readonly Exception _exception;
+
+        public ThrowingConfiguredTestSuiteProvider(Exception exception)
+        {
+            _exception = exception;
+        }
+
+        public Task<LoadedTestSuite> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromException<LoadedTestSuite>(_exception);
         }
     }
 }

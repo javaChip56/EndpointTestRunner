@@ -41,8 +41,15 @@ app.MapGet("/api/dashboard/state", (TestRunCoordinator coordinator) =>
 
 app.MapGet("/api/dashboard/manifest", async (TestRunCoordinator coordinator, CancellationToken cancellationToken) =>
 {
-    var manifest = await coordinator.GetManifestAsync(cancellationToken);
-    return Results.Ok(manifest);
+    try
+    {
+        var manifest = await coordinator.GetManifestAsync(cancellationToken);
+        return Results.Ok(manifest);
+    }
+    catch (Exception exception)
+    {
+        return Results.BadRequest(new { error = exception.Message });
+    }
 });
 
 app.MapPost("/api/dashboard/run", async (HttpRequest request, TestRunCoordinator coordinator, CancellationToken cancellationToken) =>
@@ -57,8 +64,15 @@ app.MapPost("/api/dashboard/run", async (HttpRequest request, TestRunCoordinator
 
 app.MapPost("/api/tools/curl/analyze", async (CurlAnalyzeRequest request, ICurlCommandAnalyzer analyzer, CancellationToken cancellationToken) =>
 {
-    var result = await analyzer.AnalyzeAsync(request, cancellationToken);
-    return Results.Ok(result);
+    try
+    {
+        var result = await analyzer.AnalyzeAsync(request, cancellationToken);
+        return Results.Ok(result);
+    }
+    catch (Exception exception)
+    {
+        return Results.BadRequest(new { error = exception.Message });
+    }
 });
 
 app.MapGet("/sample-api/health", () =>

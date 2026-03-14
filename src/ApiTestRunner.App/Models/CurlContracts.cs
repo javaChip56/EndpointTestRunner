@@ -16,6 +16,10 @@ public sealed class CurlAnalyzeResponse
     public CurlEnvironmentAnalysis Environment { get; init; } = new();
 
     public CurlEndpointAnalysis Endpoint { get; init; } = new();
+
+    public CurlVariableAnalysis Variables { get; init; } = new();
+
+    public IReadOnlyList<string> Warnings { get; init; } = [];
 }
 
 public sealed class CurlRequestSummary
@@ -72,4 +76,15 @@ public sealed class CurlEndpointAnalysis
     public string? SuggestedFilePath { get; init; }
 
     public string? SuggestedYaml { get; init; }
+}
+
+public sealed class CurlVariableAnalysis
+{
+    public bool HasSuggestions { get; init; }
+
+    public IReadOnlyList<string> VariableNames { get; init; } = [];
+
+    public string? SuggestedYaml { get; init; }
+
+    public bool IncludedInEnvironmentYaml { get; init; }
 }

@@ -24,39 +24,31 @@
             <div class="tool-header">
                 <div>
                     <h2>Paste cURL command</h2>
-                    <p class="helper-text">The first version focuses on common `curl`, `-X`, `-H`, `--data`, `--data-raw`, and `--url` patterns.</p>
+                    <p class="helper-text">Paste the request first, then optionally add a response body below. The main action will analyze the request, parse the response JSON, and generate YAML suggestions in one flow.</p>
                 </div>
             </div>
 
             <textarea id="curlInput" class="tool-input" spellcheck="false" placeholder="curl --location --request POST 'https://api.example.com/accounts?customerId=C1001' --header 'Content-Type: application/json' --data '{&quot;page&quot;:1}'"></textarea>
-
-            <div class="tool-actions">
-                <button id="analyzeButton" class="primary-button" type="button">Analyze Command</button>
-                <span id="analyzeStatus" class="result-summary">Waiting for input.</span>
-            </div>
         </section>
 
         <section class="tool-panel">
             <div class="tool-header">
                 <div>
                     <h2>Paste response body</h2>
-                    <p class="helper-text">Paste a JSON response body to build assertion YAML from actual response fields.</p>
+                    <p class="helper-text">Optional. Paste JSON here and the app will parse it automatically when you leave the field or run the analyzer.</p>
                 </div>
             </div>
 
             <textarea id="responseBodyInput" class="tool-input" spellcheck="false" placeholder="{&quot;statusCode&quot;:1,&quot;data&quot;:{&quot;items&quot;:[1,2,3]}}"></textarea>
 
-            <div class="tool-actions">
-                <button id="parseResponseButton" class="ghost-button" type="button">Parse Response</button>
-                <span id="responseStatus" class="result-summary">No response body parsed yet.</span>
-            </div>
+            <p id="responseStatus" class="result-summary">No response body parsed yet.</p>
         </section>
 
         <section class="tool-panel">
             <div class="tool-header">
                 <div>
                     <h2>Assertion builder</h2>
-                    <p class="helper-text">Pick a field from the parsed response, choose how it should be asserted, then include those assertions in the generated endpoint YAML.</p>
+                    <p class="helper-text">Once the response JSON has been parsed, pick a field, choose how it should be asserted, then run the generator below to append those assertions into the endpoint YAML preview.</p>
                 </div>
             </div>
 
@@ -81,6 +73,13 @@
 
             <div id="assertionList" class="assertion-draft-list">
                 <p class="result-note">No assertion rules added yet.</p>
+            </div>
+        </section>
+
+        <section class="tool-panel">
+            <div class="tool-actions">
+                <button id="analyzeButton" class="primary-button" type="button">Analyze and Generate</button>
+                <span id="analyzeStatus" class="result-summary">Waiting for input.</span>
             </div>
         </section>
 

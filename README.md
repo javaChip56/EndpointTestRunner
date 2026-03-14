@@ -19,9 +19,9 @@
 - Path params, query params, headers, and JSON request bodies
 - Dot-notation assertions with array index support
 - Validation for strings, objects, and arrays
-- Toggleable test selection in the dashboard, including select-all and individual test control
-- Pass/fail reporting with response previews in the dashboard
-- cURL analysis page that scans configured YAML definitions and generates suggested environment and endpoint YAML when missing
+- Toggleable test selection in the dashboard, including select-all, clear-all, expand-all, collapse-all, and individual test control
+- Collapsible pass/fail reporting with environment, endpoint, test, and response-preview drill-down
+- cURL analysis page that scans configured YAML definitions, generates suggested environment and endpoint YAML when missing, and supports response-driven assertion building
 - Configurable dashboard host, port, browser auto-launch, suite files, and concurrency through `appsettings.json`
 
 ## Requirements summary
@@ -48,8 +48,16 @@ The main dashboard now exposes a test-selection panel before execution:
 
 - `Select All` enables the full suite.
 - `Clear All` disables every test.
+- `Expand All` and `Collapse All` control the selection tree.
 - Environment, endpoint, and individual test checkboxes let you run only the subset you care about.
 - Each page load starts with all tests selected by default.
+
+The results view also supports:
+
+- `Expand All` and `Collapse All` for the latest result set
+- collapsible environment, endpoint, and test sections
+- per-environment passed/failed/total counts
+- response preview panels per endpoint
 
 Important note:
 
@@ -62,17 +70,23 @@ Open `http://localhost:5005/curl-import.html` to paste a cURL command and inspec
 The tool will:
 
 - parse the request URL, method, headers, query string, and JSON body
+- optionally parse a pasted JSON response body in the same flow so the assertion builder stays on the same page
+- let you add assertion drafts first, then use the main `Analyze and Generate` action to include them in the endpoint YAML preview
 - scan the configured YAML suite for an existing environment whose `baseUrl` already covers the pasted request URL
 - scan for an existing endpoint with the same method and either the same relative path or a matching path template such as `/customers/{customerId}`
 - generate suggested environment YAML when the base URL is not already present
 - generate suggested endpoint YAML when the endpoint is not already present
 - accept a pasted JSON response body so you can pick response fields and build assertion YAML into the generated endpoint test
+- let you copy generated environment or endpoint YAML directly to the clipboard
+- continue generating suggestions even when configured YAML files are missing, while showing a warning instead of failing the whole cURL import flow
 
 Current first-version scope:
 
 - best support is for common `curl`, `-X`, `-H`, `--data`, `--data-raw`, `--data-binary`, and `--url` forms
+- the page now uses one main `Analyze and Generate` action instead of separate request-analysis and response-parse steps
 - generated YAML is shown as preview text, not written directly to disk
 - the assertion builder currently targets the most common field assertions: `equals`, `notEquals`, `type`, `containsText`, `startsWith`, `endsWith`, `notEmpty`, `minCount`, `maxCount`, and `count`
+- missing YAML warnings are surfaced in the cURL import UI, but malformed YAML content still needs to be fixed before the dashboard runner can execute the suite
 
 ## CI/CD
 

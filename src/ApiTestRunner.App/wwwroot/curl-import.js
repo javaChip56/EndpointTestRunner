@@ -1,6 +1,5 @@
 const analyzeButton = document.getElementById("analyzeButton");
 const analyzeStatus = document.getElementById("analyzeStatus");
-const parseResponseButton = document.getElementById("parseResponseButton");
 const responseStatus = document.getElementById("responseStatus");
 const addAssertionButton = document.getElementById("addAssertionButton");
 const curlInput = document.getElementById("curlInput");
@@ -38,14 +37,16 @@ const assertionRuleDefinitions = {
 let parsedResponseFields = [];
 let parsedResponseObject = null;
 let assertionDrafts = [];
+let lastParsedResponseBody = "";
 
 async function analyzeCurlCommand() {
     const command = curlInput.value.trim();
     if (!command) {
-        renderStatus("Paste a cURL command first.");
+        renderStatus("Paste a cURL command first.", true);
         return;
     }
 
+    parseResponseBody();
     setBusy(true);
 
     try {
@@ -66,15 +67,19 @@ async function analyzeCurlCommand() {
         });
 
         if (!response.ok) {
-            throw new Error(`Analyze request failed with status ${response.status}`);
+            throw new Error(await buildErrorMessage(response, "Analyze request failed"));
         }
 
         const result = await response.json();
         renderResult(result);
-        renderStatus("Analysis completed.");
+        renderStatus(
+            result.warnings && result.warnings.length > 0
+                ? "Analysis completed with warnings."
+                : "Analysis completed.",
+            false);
     } catch (error) {
         analysisContainer.innerHTML = "";
-        renderStatus(error.message || "Unable to analyze the provided cURL command.");
+        renderStatus(error.message || "Unable to analyze the provided cURL command.", true);
     } finally {
         setBusy(false);
     }
@@ -86,23 +91,32 @@ function parseResponseBody() {
         parsedResponseFields = [];
         parsedResponseObject = null;
         assertionDrafts = [];
+        lastParsedResponseBody = "";
         renderAssertionBuilder();
-        responseStatus.textContent = "No response body parsed yet.";
+        renderResponseStatus("No response body parsed yet.", false);
+        return;
+    }
+
+    if (responseBody === lastParsedResponseBody && parsedResponseFields.length > 0) {
+        renderResponseStatus(`${parsedResponseFields.length} selectable fields detected.`, false);
         return;
     }
 
     try {
         parsedResponseObject = JSON.parse(responseBody);
         parsedResponseFields = collectResponseFields(parsedResponseObject);
-        assertionDrafts = [];
+        assertionDrafts = assertionDrafts.filter((draft) =>
+            parsedResponseFields.some((field) => field.path === draft.field));
+        lastParsedResponseBody = responseBody;
         renderAssertionBuilder();
-        responseStatus.textContent = `${parsedResponseFields.length} selectable fields detected.`;
+        renderResponseStatus(`${parsedResponseFields.length} selectable fields detected.`, false);
     } catch (error) {
         parsedResponseFields = [];
         parsedResponseObject = null;
         assertionDrafts = [];
+        lastParsedResponseBody = "";
         renderAssertionBuilder();
-        responseStatus.textContent = error.message || "Response body is not valid JSON.";
+        renderResponseStatus(error.message || "Response body is not valid JSON.", true);
     }
 }
 
@@ -275,7 +289,7 @@ function addAssertionDraft() {
     const rule = assertionRuleSelect.value;
 
     if (!field || !rule) {
-        responseStatus.textContent = "Parse a response body and choose a field first.";
+        renderResponseStatus("Parse a response body and choose a field first.", true);
         return;
     }
 
@@ -362,9 +376,34 @@ function renderAssertionDrafts() {
 function renderResult(result) {
     analysisContainer.innerHTML = "";
 
+    if (result.warnings && result.warnings.length > 0) {
+        analysisContainer.appendChild(renderWarningCard(result.warnings));
+    }
+
     analysisContainer.appendChild(renderRequestCard(result.request));
+    if (result.variables && result.variables.hasSuggestions) {
+        analysisContainer.appendChild(renderVariablesCard(result.variables));
+    }
     analysisContainer.appendChild(renderEnvironmentCard(result.environment));
     analysisContainer.appendChild(renderEndpointCard(result.endpoint));
+}
+
+function renderWarningCard(warnings) {
+    const card = document.createElement("section");
+    card.className = "preview-card warning-card";
+    card.innerHTML = "<h2>Warnings</h2><p class=\"result-note\">The analyzer continued with generated suggestions even though the configured YAML suite could not be loaded fully.</p>";
+
+    const list = document.createElement("ul");
+    list.className = "warning-list";
+
+    warnings.forEach((warning) => {
+        const item = document.createElement("li");
+        item.textContent = warning;
+        list.appendChild(item);
+    });
+
+    card.appendChild(list);
+    return card;
 }
 
 function renderRequestCard(request) {
@@ -530,15 +569,61 @@ function getJsonValueType(value) {
     }
 }
 
-function renderStatus(message) {
+function renderStatus(message, isError) {
     analyzeStatus.textContent = message;
+    analyzeStatus.classList.toggle("status-error", Boolean(isError));
+}
+
+function renderVariablesCard(variables) {
+    const summary = variables.includedInEnvironmentYaml
+        ? "Suggested variables detected from the cURL request. They are already included in the generated environment YAML below."
+        : "Suggested variables detected from the cURL request. Paste this block into an existing environment YAML file.";
+
+    const card = createCard("Variable suggestions", summary);
+    card.appendChild(createBadgeRow(true, `${variables.variableNames.length} variables suggested`));
+
+    const details = document.createElement("dl");
+    details.className = "detail-list";
+    details.appendChild(createDetail("Variable names", variables.variableNames.join(", ")));
+    card.appendChild(details);
+
+    if (variables.suggestedYaml) {
+        card.appendChild(createCopyAction(variables.suggestedYaml, "Copy variables YAML"));
+        const preview = document.createElement("pre");
+        preview.className = "code-block";
+        preview.textContent = variables.suggestedYaml;
+        card.appendChild(preview);
+    }
+
+    return card;
+}
+
+function renderResponseStatus(message, isError) {
+    responseStatus.textContent = message;
+    responseStatus.classList.toggle("status-error", Boolean(isError));
 }
 
 function setBusy(isBusy) {
     analyzeButton.disabled = isBusy;
-    parseResponseButton.disabled = isBusy;
     addAssertionButton.disabled = isBusy || parsedResponseFields.length === 0;
-    analyzeButton.textContent = isBusy ? "Analyzing..." : "Analyze Command";
+    analyzeButton.textContent = isBusy ? "Analyzing..." : "Analyze and Generate";
+}
+
+async function buildErrorMessage(response, fallbackMessage) {
+    try {
+        const payload = await response.json();
+        if (payload && typeof payload.error === "string" && payload.error.trim()) {
+            return payload.error;
+        }
+
+        if (payload && typeof payload.title === "string" && payload.title.trim()) {
+            return payload.title;
+        }
+    } catch {
+        // Fall back below.
+    }
+
+    return `${fallbackMessage} with status ${response.status}`;
 }
 
 function escapeHtml(value) {
@@ -548,7 +633,6 @@ function escapeHtml(value) {
         .replaceAll(">", "&gt;");
 }
 
-parseResponseButton.addEventListener("click", parseResponseBody);
 assertionFieldSelect.addEventListener("change", () => {
     renderRuleOptions();
     renderValueInput();
@@ -556,5 +640,6 @@ assertionFieldSelect.addEventListener("change", () => {
 assertionRuleSelect.addEventListener("change", renderValueInput);
 addAssertionButton.addEventListener("click", addAssertionDraft);
 analyzeButton.addEventListener("click", analyzeCurlCommand);
+responseBodyInput.addEventListener("blur", parseResponseBody);
 
 renderAssertionBuilder();
