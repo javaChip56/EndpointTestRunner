@@ -36,7 +36,7 @@ public sealed class StartupAutomationHostedService : IHostedService
                     TryLaunchBrowser(dashboardUrl);
                 }
 
-                await _testRunCoordinator.ExecuteAsync(CancellationToken.None);
+                await _testRunCoordinator.ExecuteAsync(selectionRequest: null, cancellationToken: CancellationToken.None);
             });
         });
 
