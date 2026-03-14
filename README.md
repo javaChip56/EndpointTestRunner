@@ -62,15 +62,17 @@ Open `http://localhost:5005/curl-import.html` to paste a cURL command and inspec
 The tool will:
 
 - parse the request URL, method, headers, query string, and JSON body
-- scan the configured YAML suite for an existing environment with the same base URL
-- scan for an existing endpoint with the same method and either the same path or a matching path template such as `/customers/{customerId}`
+- scan the configured YAML suite for an existing environment whose `baseUrl` already covers the pasted request URL
+- scan for an existing endpoint with the same method and either the same relative path or a matching path template such as `/customers/{customerId}`
 - generate suggested environment YAML when the base URL is not already present
 - generate suggested endpoint YAML when the endpoint is not already present
+- accept a pasted JSON response body so you can pick response fields and build assertion YAML into the generated endpoint test
 
 Current first-version scope:
 
 - best support is for common `curl`, `-X`, `-H`, `--data`, `--data-raw`, `--data-binary`, and `--url` forms
 - generated YAML is shown as preview text, not written directly to disk
+- the assertion builder currently targets the most common field assertions: `equals`, `notEquals`, `type`, `containsText`, `startsWith`, `endsWith`, `notEmpty`, `minCount`, `maxCount`, and `count`
 
 ## CI/CD
 

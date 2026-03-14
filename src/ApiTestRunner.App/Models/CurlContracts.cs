@@ -3,6 +3,10 @@ namespace ApiTestRunner.App.Models;
 public sealed class CurlAnalyzeRequest
 {
     public string Command { get; init; } = string.Empty;
+
+    public string? ResponseBody { get; init; }
+
+    public IReadOnlyList<CurlAssertionDraft> Assertions { get; init; } = [];
 }
 
 public sealed class CurlAnalyzeResponse
@@ -31,6 +35,17 @@ public sealed class CurlRequestSummary
     public object? Body { get; init; }
 
     public string? RawBody { get; init; }
+
+    public string? RelativePath { get; init; }
+}
+
+public sealed class CurlAssertionDraft
+{
+    public string Field { get; init; } = string.Empty;
+
+    public string Rule { get; init; } = string.Empty;
+
+    public object? Value { get; init; }
 }
 
 public sealed class CurlEnvironmentAnalysis

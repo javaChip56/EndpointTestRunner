@@ -520,6 +520,21 @@ details[open] > .test-summary-row::after {
     gap: 1rem;
 }
 
+.assertion-builder-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.field-stack {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.field-stack span {
+    font-weight: 700;
+}
+
 .tool-input {
     width: 100%;
     min-height: 180px;
@@ -527,6 +542,16 @@ details[open] > .test-summary-row::after {
     border-radius: 16px;
     padding: 1rem;
     resize: vertical;
+    font: inherit;
+    background: rgba(255, 255, 255, 0.86);
+}
+
+.tool-select,
+.tool-input-inline {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 0.8rem 0.9rem;
     font: inherit;
     background: rgba(255, 255, 255, 0.86);
 }
@@ -594,6 +619,37 @@ details[open] > .test-summary-row::after {
     border-radius: 999px;
     font-weight: 700;
     font-size: 0.85rem;
+}
+
+.assertion-draft-list {
+    margin-top: 1rem;
+    display: grid;
+    gap: 0.8rem;
+}
+
+.assertion-draft-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.9rem 1rem;
+    border-radius: 16px;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.68);
+}
+
+.inline-button {
+    padding: 0.55rem 0.9rem;
+}
+
+.copy-action-row {
+    margin-top: 0.9rem;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.copy-button {
+    min-width: 170px;
 }
 
 @media (max-width: 720px) {

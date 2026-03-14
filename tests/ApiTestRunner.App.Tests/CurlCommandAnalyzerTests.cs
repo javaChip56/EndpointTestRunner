@@ -47,6 +47,32 @@ public sealed class CurlCommandAnalyzerTests
     }
 
     [Fact]
+    public async Task AnalyzeAsync_DoesNotSuggestEnvironmentWhenExistingBaseUrlContainsPathPrefix()
+    {
+        var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
+        {
+            Environments =
+            [
+                new EnvironmentDefinition
+                {
+                    Name = "PartnerUat",
+                    BaseUrl = "https://api.partner.com/AccountHoldingsMgmt"
+                }
+            ]
+        }));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            Command = "curl --request POST \"https://api.partner.com/AccountHoldingsMgmt/GetAccountList\""
+        });
+
+        Assert.True(result.Environment.Exists);
+        Assert.Contains("PartnerUat", result.Environment.MatchedEnvironmentNames);
+        Assert.Null(result.Environment.SuggestedYaml);
+        Assert.Equal("/GetAccountList", result.Request?.RelativePath);
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_GeneratesEnvironmentAndEndpointYamlWhenMissing()
     {
         var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
@@ -78,6 +104,48 @@ public sealed class CurlCommandAnalyzerTests
         Assert.Contains("path: /AccountHoldingsMgmt/GetAccountList", result.Endpoint.SuggestedYaml);
         Assert.Contains("baseCurrency: SGD", result.Endpoint.SuggestedYaml);
         Assert.Contains("currentPageNumber: 1", result.Endpoint.SuggestedYaml);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_IncludesSelectedAssertionsInGeneratedYaml()
+    {
+        var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
+        {
+            Environments = []
+        }));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            Command = "curl --request POST \"https://api.partner.com/AccountHoldingsMgmt/GetAccountList\"",
+            Assertions =
+            [
+                new CurlAssertionDraft
+                {
+                    Field = "statusCode",
+                    Rule = "equals",
+                    Value = 1
+                },
+                new CurlAssertionDraft
+                {
+                    Field = "data.pagenationTemplate.dataLists",
+                    Rule = "minCount",
+                    Value = 1
+                },
+                new CurlAssertionDraft
+                {
+                    Field = "data.pagenationTemplate.dataLists",
+                    Rule = "notEmpty",
+                    Value = true
+                }
+            ]
+        });
+
+        Assert.NotNull(result.Endpoint.SuggestedYaml);
+        Assert.Contains("field: statusCode", result.Endpoint.SuggestedYaml);
+        Assert.Contains("equals: 1", result.Endpoint.SuggestedYaml);
+        Assert.Contains("field: data.pagenationTemplate.dataLists", result.Endpoint.SuggestedYaml);
+        Assert.Contains("minCount: 1", result.Endpoint.SuggestedYaml);
+        Assert.Contains("notEmpty: true", result.Endpoint.SuggestedYaml);
     }
 
     private sealed class StubConfiguredTestSuiteProvider : IConfiguredTestSuiteProvider
