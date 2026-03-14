@@ -15,6 +15,7 @@
 - Multiple endpoints per base URL
 - One YAML file per endpoint when preferred
 - Shared environment definition files
+- Local AdminLTE-based dashboard shell with vendored static assets under `wwwroot/lib`
 - Exact file paths, directories, and glob patterns in `Execution.TestFiles`
 - Path params, query params, headers, and JSON request bodies
 - Dot-notation assertions with array index support
@@ -51,6 +52,7 @@ The main dashboard now exposes a test-selection panel before execution:
 - `Expand All` and `Collapse All` control the selection tree.
 - Environment, endpoint, and individual test checkboxes let you run only the subset you care about.
 - Each page load starts with all tests selected by default.
+- The dashboard and cURL import pages use local AdminLTE assets, so the UI does not rely on external CDNs at runtime.
 
 The results view also supports:
 

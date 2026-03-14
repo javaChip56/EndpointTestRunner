@@ -407,7 +407,7 @@ function renderWarningCard(warnings) {
 }
 
 function renderRequestCard(request) {
-    const card = createCard("Parsed request", "What the app extracted from the cURL command.");
+    const { card, body } = createCard("Parsed request", "What the app extracted from the cURL command.");
     const details = document.createElement("dl");
     details.className = "detail-list";
     details.appendChild(createDetail("Method", request.method));
@@ -418,13 +418,13 @@ function renderRequestCard(request) {
     details.appendChild(createDetail("Query", request.query && Object.keys(request.query).length > 0 ? JSON.stringify(request.query, null, 2) : "(none)"));
     details.appendChild(createDetail("Headers", request.headers && Object.keys(request.headers).length > 0 ? JSON.stringify(request.headers, null, 2) : "(none)"));
     details.appendChild(createDetail("Body", formatSample(request.body) || request.rawBody || "(none)"));
-    card.appendChild(details);
+    body.appendChild(details);
     return card;
 }
 
 function renderEnvironmentCard(environment) {
-    const card = createCard("Environment scan", "Checks all loaded environment YAML definitions for an existing URL match before suggesting a new environment file.");
-    card.appendChild(createBadgeRow(environment.exists, environment.exists ? "Environment found" : "Environment missing"));
+    const { card, body } = createCard("Environment scan", "Checks all loaded environment YAML definitions for an existing URL match before suggesting a new environment file.");
+    body.appendChild(createBadgeRow(environment.exists, environment.exists ? "Environment found" : "Environment missing"));
 
     const details = document.createElement("dl");
     details.className = "detail-list";
@@ -435,22 +435,22 @@ function renderEnvironmentCard(environment) {
         details.appendChild(createDetail("Suggested file path", environment.suggestedFilePath));
     }
 
-    card.appendChild(details);
+    body.appendChild(details);
 
     if (environment.suggestedYaml) {
-        card.appendChild(createCopyAction(environment.suggestedYaml, "Copy environment YAML"));
+        body.appendChild(createCopyAction(environment.suggestedYaml, "Copy environment YAML"));
         const preview = document.createElement("pre");
         preview.className = "code-block";
         preview.textContent = environment.suggestedYaml;
-        card.appendChild(preview);
+        body.appendChild(preview);
     }
 
     return card;
 }
 
 function renderEndpointCard(endpoint) {
-    const card = createCard("Endpoint scan", "Checks whether the endpoint already exists, then generates endpoint YAML including any assertion rules you added.");
-    card.appendChild(createBadgeRow(endpoint.exists, endpoint.exists ? "Endpoint found" : "Endpoint missing"));
+    const { card, body } = createCard("Endpoint scan", "Checks whether the endpoint already exists, then generates endpoint YAML including any assertion rules you added.");
+    body.appendChild(createBadgeRow(endpoint.exists, endpoint.exists ? "Endpoint found" : "Endpoint missing"));
 
     const details = document.createElement("dl");
     details.className = "detail-list";
@@ -461,24 +461,35 @@ function renderEndpointCard(endpoint) {
         details.appendChild(createDetail("Suggested file path", endpoint.suggestedFilePath));
     }
 
-    card.appendChild(details);
+    body.appendChild(details);
 
     if (endpoint.suggestedYaml) {
-        card.appendChild(createCopyAction(endpoint.suggestedYaml, "Copy endpoint YAML"));
+        body.appendChild(createCopyAction(endpoint.suggestedYaml, "Copy endpoint YAML"));
         const preview = document.createElement("pre");
         preview.className = "code-block";
         preview.textContent = endpoint.suggestedYaml;
-        card.appendChild(preview);
+        body.appendChild(preview);
     }
 
     return card;
 }
 
 function createCard(title, summary) {
-    const card = document.createElement("section");
-    card.className = "preview-card";
-    card.innerHTML = `<h2>${escapeHtml(title)}</h2><p class="result-note">${escapeHtml(summary)}</p>`;
-    return card;
+    const card = document.createElement("details");
+    card.className = "preview-card collapsible-preview-card";
+    card.open = true;
+
+    const header = document.createElement("summary");
+    header.className = "preview-card-summary";
+    header.innerHTML = `<h2>${escapeHtml(title)}</h2><p class="result-note">${escapeHtml(summary)}</p>`;
+
+    const body = document.createElement("div");
+    body.className = "preview-card-body";
+
+    card.appendChild(header);
+    card.appendChild(body);
+
+    return { card, body };
 }
 
 function createBadgeRow(isPassing, text) {
@@ -579,20 +590,20 @@ function renderVariablesCard(variables) {
         ? "Suggested variables detected from the cURL request. They are already included in the generated environment YAML below."
         : "Suggested variables detected from the cURL request. Paste this block into an existing environment YAML file.";
 
-    const card = createCard("Variable suggestions", summary);
-    card.appendChild(createBadgeRow(true, `${variables.variableNames.length} variables suggested`));
+    const { card, body } = createCard("Variable suggestions", summary);
+    body.appendChild(createBadgeRow(true, `${variables.variableNames.length} variables suggested`));
 
     const details = document.createElement("dl");
     details.className = "detail-list";
     details.appendChild(createDetail("Variable names", variables.variableNames.join(", ")));
-    card.appendChild(details);
+    body.appendChild(details);
 
     if (variables.suggestedYaml) {
-        card.appendChild(createCopyAction(variables.suggestedYaml, "Copy variables YAML"));
+        body.appendChild(createCopyAction(variables.suggestedYaml, "Copy variables YAML"));
         const preview = document.createElement("pre");
         preview.className = "code-block";
         preview.textContent = variables.suggestedYaml;
-        card.appendChild(preview);
+        body.appendChild(preview);
     }
 
     return card;
@@ -606,7 +617,9 @@ function renderResponseStatus(message, isError) {
 function setBusy(isBusy) {
     analyzeButton.disabled = isBusy;
     addAssertionButton.disabled = isBusy || parsedResponseFields.length === 0;
-    analyzeButton.textContent = isBusy ? "Analyzing..." : "Analyze and Generate";
+    analyzeButton.innerHTML = isBusy
+        ? "<i class=\"fa-solid fa-spinner fa-spin button-icon\"></i>Analyzing..."
+        : "<i class=\"fa-solid fa-wand-magic-sparkles button-icon\"></i>Analyze and Generate";
 }
 
 async function buildErrorMessage(response, fallbackMessage) {

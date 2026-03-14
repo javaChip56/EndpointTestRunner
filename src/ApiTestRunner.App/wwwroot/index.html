@@ -4,91 +4,200 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>API Test Runner</title>
+    <link rel="stylesheet" href="/lib/fontawesome/css/all.min.css" />
+    <link rel="stylesheet" href="/lib/adminlte/css/adminlte.min.css" />
     <link rel="stylesheet" href="/styles.css" />
 </head>
-<body>
-    <div class="page-shell">
-        <header class="hero">
-            <div>
-                <p class="eyebrow">Embedded dashboard</p>
-                <h1>YAML-driven API test runner</h1>
-                <p class="subtitle">Runs the configured suite, evaluates JSON assertions, and keeps the latest pass/fail snapshot local.</p>
-                <nav class="page-nav">
-                    <a href="/index.html" class="nav-link nav-link-active">Dashboard</a>
-                    <a href="/curl-import.html" class="nav-link">cURL Import</a>
+<body class="layout-fixed sidebar-expand-lg bg-body-tertiary app-shell">
+    <div class="app-wrapper">
+        <nav class="app-header navbar navbar-expand bg-body">
+            <div class="container-fluid">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" data-lte-toggle="sidebar" href="#" role="button" aria-label="Toggle sidebar">
+                            <i class="fa-solid fa-bars"></i>
+                        </a>
+                    </li>
+                    <li class="nav-item d-none d-md-block">
+                        <span class="nav-link fw-semibold text-body-emphasis">API Test Runner</span>
+                    </li>
+                </ul>
+                <div class="ms-auto d-flex flex-wrap gap-2">
+                    <button id="runButton" class="primary-button" type="button"><i class="fa-solid fa-play button-icon"></i>Run Tests</button>
+                    <button id="refreshButton" class="ghost-button" type="button"><i class="fa-solid fa-rotate-right button-icon"></i>Refresh</button>
+                </div>
+            </div>
+        </nav>
+
+        <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
+            <div class="sidebar-brand">
+                <a href="/index.html" class="brand-link text-decoration-none">
+                    <span class="brand-image app-brand-icon">
+                        <i class="fa-solid fa-vial-circle-check"></i>
+                    </span>
+                    <span class="brand-text fw-light">API Test Runner</span>
+                </a>
+            </div>
+            <div class="sidebar-wrapper">
+                <nav class="mt-2">
+                    <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu" data-accordion="false">
+                        <li class="nav-item">
+                            <a href="/index.html" class="nav-link active">
+                                <i class="nav-icon fa-solid fa-chart-line"></i>
+                                <p>Dashboard</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="/curl-import.html" class="nav-link">
+                                <i class="nav-icon fa-solid fa-terminal"></i>
+                                <p>cURL Import</p>
+                            </a>
+                        </li>
+                    </ul>
                 </nav>
-            </div>
-            <div class="hero-actions">
-                <button id="runButton" class="primary-button">Run Tests</button>
-                <button id="refreshButton" class="ghost-button">Refresh</button>
-            </div>
-        </header>
-
-        <section class="selection-panel">
-            <div class="selection-header">
-                <div>
-                    <h2>Test selection</h2>
-                    <p id="selectionSummary" class="selection-summary">Loading test manifest...</p>
-                </div>
-                <div class="selection-actions">
-                    <button id="selectAllButton" class="ghost-button" type="button">Select All</button>
-                    <button id="clearAllButton" class="ghost-button" type="button">Clear All</button>
-                    <button id="expandSelectionButton" class="ghost-button" type="button">Expand All</button>
-                    <button id="collapseSelectionButton" class="ghost-button" type="button">Collapse All</button>
+                <div class="sidebar-note">
+                    <p class="sidebar-note-label">Current mode</p>
+                    <p class="sidebar-note-value">Run YAML suites, inspect the latest state, and drill into failing assertions.</p>
                 </div>
             </div>
-            <div id="selectionContainer" class="selection-tree"></div>
-        </section>
+        </aside>
 
-        <section class="summary-grid" id="summaryGrid">
-            <article class="summary-card">
-                <span>Total tests</span>
-                <strong id="totalTests">-</strong>
-            </article>
-            <article class="summary-card">
-                <span>Passed</span>
-                <strong id="passedTests">-</strong>
-            </article>
-            <article class="summary-card">
-                <span>Failed</span>
-                <strong id="failedTests">-</strong>
-            </article>
-            <article class="summary-card">
-                <span>Duration</span>
-                <strong id="totalDuration">-</strong>
-            </article>
-        </section>
-
-        <section class="status-panel">
-            <div>
-                <h2>Run status</h2>
-                <p id="runStatus">Waiting for the first test run.</p>
-            </div>
-            <div class="timestamps">
-                <span id="startedAt">Started: -</span>
-                <span id="completedAt">Completed: -</span>
-            </div>
-        </section>
-
-        <section class="results-panel">
-            <div class="selection-header">
-                <div>
-                    <h2>Test results</h2>
-                    <p id="resultsSummary" class="result-summary">Use the controls to expand or collapse the latest results.</p>
-                </div>
-                <div class="selection-actions">
-                    <button id="expandResultsButton" class="ghost-button" type="button">Expand All</button>
-                    <button id="collapseResultsButton" class="ghost-button" type="button">Collapse All</button>
+        <main class="app-main">
+            <div class="app-content-header">
+                <div class="container-fluid">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                        <div>
+                            <h1 class="content-header-title">YAML-driven API test runner</h1>
+                            <p class="page-subtitle">Runs the configured suite, evaluates JSON assertions, and keeps the latest pass/fail snapshot local.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </section>
 
-        <main id="environmentContainer" class="environment-container"></main>
+            <div class="app-content">
+                <div class="container-fluid">
+                    <div class="row g-4">
+                        <div class="col-6 col-xl-3">
+                            <section class="card metric-card metric-card-total">
+                                <div class="card-body metric-card-body">
+                                    <div>
+                                        <strong id="totalTests" class="metric-value">-</strong>
+                                        <span class="metric-label">Total tests</span>
+                                    </div>
+                                    <span class="metric-icon" aria-hidden="true">
+                                        <i class="fa-solid fa-flask-vial"></i>
+                                    </span>
+                                </div>
+                            </section>
+                        </div>
+                        <div class="col-6 col-xl-3">
+                            <section class="card metric-card metric-card-pass">
+                                <div class="card-body metric-card-body">
+                                    <div>
+                                        <strong id="passedTests" class="metric-value">-</strong>
+                                        <span class="metric-label">Passed</span>
+                                    </div>
+                                    <span class="metric-icon" aria-hidden="true">
+                                        <i class="fa-solid fa-circle-check"></i>
+                                    </span>
+                                </div>
+                            </section>
+                        </div>
+                        <div class="col-6 col-xl-3">
+                            <section class="card metric-card metric-card-fail">
+                                <div class="card-body metric-card-body">
+                                    <div>
+                                        <strong id="failedTests" class="metric-value">-</strong>
+                                        <span class="metric-label">Failed</span>
+                                    </div>
+                                    <span class="metric-icon" aria-hidden="true">
+                                        <i class="fa-solid fa-triangle-exclamation"></i>
+                                    </span>
+                                </div>
+                            </section>
+                        </div>
+                        <div class="col-6 col-xl-3">
+                            <section class="card metric-card metric-card-duration">
+                                <div class="card-body metric-card-body">
+                                    <div>
+                                        <strong id="totalDuration" class="metric-value">-</strong>
+                                        <span class="metric-label">Duration</span>
+                                    </div>
+                                    <span class="metric-icon" aria-hidden="true">
+                                        <i class="fa-solid fa-stopwatch"></i>
+                                    </span>
+                                </div>
+                            </section>
+                        </div>
+
+                        <div class="col-12">
+                            <section class="card status-panel">
+                                <div class="card-header border-0">
+                                    <div>
+                                        <h2 class="panel-title"><i class="fa-solid fa-signal panel-title-icon"></i>Run status</h2>
+                                        <p id="runStatus" class="panel-note mb-0">Waiting for the first test run.</p>
+                                    </div>
+                                </div>
+                                <div class="card-body pt-0">
+                                    <div class="timestamps">
+                                        <span id="startedAt">Started: -</span>
+                                        <span id="completedAt">Completed: -</span>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+
+                        <div class="col-12">
+                            <section class="card selection-panel">
+                                <div class="card-header border-0">
+                                    <div class="selection-header">
+                                        <div>
+                                            <h2 class="panel-title"><i class="fa-solid fa-list-check panel-title-icon"></i>Test selection</h2>
+                                            <p id="selectionSummary" class="panel-note mb-0">Loading test manifest...</p>
+                                        </div>
+                                        <div class="selection-actions">
+                                            <button id="selectAllButton" class="ghost-button" type="button"><i class="fa-solid fa-check-double button-icon"></i>Select All</button>
+                                            <button id="clearAllButton" class="ghost-button" type="button"><i class="fa-solid fa-eraser button-icon"></i>Clear All</button>
+                                            <button id="expandSelectionButton" class="ghost-button" type="button"><i class="fa-solid fa-up-right-and-down-left-from-center button-icon"></i>Expand All</button>
+                                            <button id="collapseSelectionButton" class="ghost-button" type="button"><i class="fa-solid fa-down-left-and-up-right-to-center button-icon"></i>Collapse All</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body pt-0">
+                                    <div id="selectionContainer" class="selection-tree"></div>
+                                </div>
+                            </section>
+                        </div>
+
+                        <div class="col-12">
+                            <section class="card results-panel">
+                                <div class="card-header border-0">
+                                    <div class="selection-header">
+                                        <div>
+                                            <h2 class="panel-title"><i class="fa-solid fa-wave-square panel-title-icon"></i>Test results</h2>
+                                            <p id="resultsSummary" class="panel-note mb-0">Use the controls to expand or collapse the latest results.</p>
+                                        </div>
+                                        <div class="selection-actions">
+                                            <button id="expandResultsButton" class="ghost-button" type="button"><i class="fa-solid fa-up-right-and-down-left-from-center button-icon"></i>Expand All</button>
+                                            <button id="collapseResultsButton" class="ghost-button" type="button"><i class="fa-solid fa-down-left-and-up-right-to-center button-icon"></i>Collapse All</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+
+                        <div class="col-12">
+                            <section id="environmentContainer" class="environment-container"></section>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 
     <template id="environmentTemplate">
-        <details class="environment-card">
-            <summary class="environment-summary-row">
+        <details class="card environment-card">
+            <summary class="card-header environment-summary-row">
                 <header class="environment-header">
                     <div>
                         <h3 class="environment-name"></h3>
@@ -98,15 +207,15 @@
                     <span class="environment-badge"></span>
                 </header>
             </summary>
-            <div class="environment-details">
+            <div class="card-body environment-details">
                 <div class="endpoint-list"></div>
             </div>
         </details>
     </template>
 
     <template id="endpointTemplate">
-        <details class="endpoint-card">
-            <summary class="endpoint-summary-row">
+        <details class="card endpoint-card">
+            <summary class="card-header endpoint-summary-row">
                 <header class="endpoint-header">
                     <div>
                         <h4 class="endpoint-name"></h4>
@@ -115,7 +224,7 @@
                     <span class="endpoint-badge"></span>
                 </header>
             </summary>
-            <div class="endpoint-details">
+            <div class="card-body endpoint-details">
                 <div class="test-list"></div>
                 <details class="response-panel">
                     <summary>Response preview</summary>
@@ -126,20 +235,21 @@
     </template>
 
     <template id="testTemplate">
-        <details class="test-card">
-            <summary class="test-summary-row">
+        <details class="card test-card">
+            <summary class="card-header test-summary-row">
                 <div class="test-title-row">
                     <strong class="test-name"></strong>
                     <span class="test-badge"></span>
                 </div>
                 <p class="test-status-line"></p>
             </summary>
-            <div class="test-details">
+            <div class="card-body test-details">
                 <ul class="assertion-list"></ul>
             </div>
         </details>
     </template>
 
+    <script src="/lib/adminlte/js/adminlte.min.js"></script>
     <script src="/app.js"></script>
 </body>
 </html>
