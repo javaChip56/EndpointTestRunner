@@ -63,4 +63,30 @@ public sealed class AssertionEvaluatorTests
         Assert.Equal("field", result.Rule);
         Assert.Contains("Invalid field path", result.Message);
     }
+
+    [Fact]
+    public void EvaluateAll_ResolvesPropertiesCaseInsensitively()
+    {
+        var response = JsonNode.Parse("""
+            {
+              "StatusCode": 1,
+              "Data": {
+                "PagenationTemplate": {
+                  "DataLists": [1]
+                }
+              }
+            }
+            """);
+
+        var assertions = new[]
+        {
+            new AssertionDefinition { Field = "statusCode", EqualsValue = 1 },
+            new AssertionDefinition { Field = "data.pagenationTemplate.dataLists", MinCount = 1 }
+        };
+
+        var results = _evaluator.EvaluateAll(assertions, response);
+
+        Assert.NotEmpty(results);
+        Assert.All(results, result => Assert.True(result.IsSuccess, result.Message));
+    }
 }

@@ -19,7 +19,8 @@ internal static class JsonFieldNavigator
             switch (token)
             {
                 case PropertyPathToken property:
-                    if (result is not JsonObject jsonObject || !jsonObject.TryGetPropertyValue(property.Name, out result))
+                    if (result is not JsonObject jsonObject ||
+                        !TryGetPropertyValue(jsonObject, property.Name, out result))
                     {
                         result = null;
                         return false;
@@ -40,6 +41,26 @@ internal static class JsonFieldNavigator
         }
 
         return result is not null;
+    }
+
+    private static bool TryGetPropertyValue(JsonObject jsonObject, string propertyName, out JsonNode? result)
+    {
+        if (jsonObject.TryGetPropertyValue(propertyName, out result))
+        {
+            return true;
+        }
+
+        foreach (var property in jsonObject)
+        {
+            if (string.Equals(property.Key, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                result = property.Value;
+                return true;
+            }
+        }
+
+        result = null;
+        return false;
     }
 
     private static IReadOnlyList<PathToken> Tokenize(string fieldPath)
