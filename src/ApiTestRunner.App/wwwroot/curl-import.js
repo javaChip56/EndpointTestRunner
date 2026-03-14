@@ -606,7 +606,9 @@ function renderResponseStatus(message, isError) {
 function setBusy(isBusy) {
     analyzeButton.disabled = isBusy;
     addAssertionButton.disabled = isBusy || parsedResponseFields.length === 0;
-    analyzeButton.textContent = isBusy ? "Analyzing..." : "Analyze and Generate";
+    analyzeButton.innerHTML = isBusy
+        ? "<i class=\"fa-solid fa-spinner fa-spin button-icon\"></i>Analyzing..."
+        : "<i class=\"fa-solid fa-wand-magic-sparkles button-icon\"></i>Analyze and Generate";
 }
 
 async function buildErrorMessage(response, fallbackMessage) {

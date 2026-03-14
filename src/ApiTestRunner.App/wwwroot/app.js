@@ -462,7 +462,9 @@ async function buildErrorMessage(response, fallbackMessage) {
 function setBusy(isBusy) {
     runButton.disabled = isBusy;
     refreshButton.disabled = isBusy;
-    runButton.textContent = isBusy ? "Running..." : "Run Tests";
+    runButton.innerHTML = isBusy
+        ? "<i class=\"fa-solid fa-spinner fa-spin button-icon\"></i>Running..."
+        : "<i class=\"fa-solid fa-play button-icon\"></i>Run Tests";
     updateSelectionButtons(Boolean(suiteManifest) && !isBusy);
     updateResultButtons(Boolean(lastRunState?.lastRun) && !isBusy);
 }

@@ -23,8 +23,8 @@
                     </li>
                 </ul>
                 <div class="ms-auto d-flex flex-wrap gap-2">
-                    <button id="runButton" class="primary-button" type="button">Run Tests</button>
-                    <button id="refreshButton" class="ghost-button" type="button">Refresh</button>
+                    <button id="runButton" class="primary-button" type="button"><i class="fa-solid fa-play button-icon"></i>Run Tests</button>
+                    <button id="refreshButton" class="ghost-button" type="button"><i class="fa-solid fa-rotate-right button-icon"></i>Refresh</button>
                 </div>
             </div>
         </nav>
@@ -79,33 +79,53 @@
                     <div class="row g-4">
                         <div class="col-6 col-xl-3">
                             <section class="card metric-card metric-card-total">
-                                <div class="card-body">
-                                    <span class="metric-label">Total tests</span>
-                                    <strong id="totalTests" class="metric-value">-</strong>
+                                <div class="card-body metric-card-body">
+                                    <div>
+                                        <span class="metric-label">Total tests</span>
+                                        <strong id="totalTests" class="metric-value">-</strong>
+                                    </div>
+                                    <span class="metric-icon" aria-hidden="true">
+                                        <i class="fa-solid fa-flask-vial"></i>
+                                    </span>
                                 </div>
                             </section>
                         </div>
                         <div class="col-6 col-xl-3">
                             <section class="card metric-card metric-card-pass">
-                                <div class="card-body">
-                                    <span class="metric-label">Passed</span>
-                                    <strong id="passedTests" class="metric-value">-</strong>
+                                <div class="card-body metric-card-body">
+                                    <div>
+                                        <span class="metric-label">Passed</span>
+                                        <strong id="passedTests" class="metric-value">-</strong>
+                                    </div>
+                                    <span class="metric-icon" aria-hidden="true">
+                                        <i class="fa-solid fa-circle-check"></i>
+                                    </span>
                                 </div>
                             </section>
                         </div>
                         <div class="col-6 col-xl-3">
                             <section class="card metric-card metric-card-fail">
-                                <div class="card-body">
-                                    <span class="metric-label">Failed</span>
-                                    <strong id="failedTests" class="metric-value">-</strong>
+                                <div class="card-body metric-card-body">
+                                    <div>
+                                        <span class="metric-label">Failed</span>
+                                        <strong id="failedTests" class="metric-value">-</strong>
+                                    </div>
+                                    <span class="metric-icon" aria-hidden="true">
+                                        <i class="fa-solid fa-triangle-exclamation"></i>
+                                    </span>
                                 </div>
                             </section>
                         </div>
                         <div class="col-6 col-xl-3">
                             <section class="card metric-card metric-card-duration">
-                                <div class="card-body">
-                                    <span class="metric-label">Duration</span>
-                                    <strong id="totalDuration" class="metric-value">-</strong>
+                                <div class="card-body metric-card-body">
+                                    <div>
+                                        <span class="metric-label">Duration</span>
+                                        <strong id="totalDuration" class="metric-value">-</strong>
+                                    </div>
+                                    <span class="metric-icon" aria-hidden="true">
+                                        <i class="fa-solid fa-stopwatch"></i>
+                                    </span>
                                 </div>
                             </section>
                         </div>
@@ -114,7 +134,7 @@
                             <section class="card status-panel">
                                 <div class="card-header border-0">
                                     <div>
-                                        <h2 class="panel-title">Run status</h2>
+                                        <h2 class="panel-title"><i class="fa-solid fa-signal panel-title-icon"></i>Run status</h2>
                                         <p id="runStatus" class="panel-note mb-0">Waiting for the first test run.</p>
                                     </div>
                                 </div>
@@ -132,14 +152,14 @@
                                 <div class="card-header border-0">
                                     <div class="selection-header">
                                         <div>
-                                            <h2 class="panel-title">Test selection</h2>
+                                            <h2 class="panel-title"><i class="fa-solid fa-list-check panel-title-icon"></i>Test selection</h2>
                                             <p id="selectionSummary" class="panel-note mb-0">Loading test manifest...</p>
                                         </div>
                                         <div class="selection-actions">
-                                            <button id="selectAllButton" class="ghost-button" type="button">Select All</button>
-                                            <button id="clearAllButton" class="ghost-button" type="button">Clear All</button>
-                                            <button id="expandSelectionButton" class="ghost-button" type="button">Expand All</button>
-                                            <button id="collapseSelectionButton" class="ghost-button" type="button">Collapse All</button>
+                                            <button id="selectAllButton" class="ghost-button" type="button"><i class="fa-solid fa-check-double button-icon"></i>Select All</button>
+                                            <button id="clearAllButton" class="ghost-button" type="button"><i class="fa-solid fa-eraser button-icon"></i>Clear All</button>
+                                            <button id="expandSelectionButton" class="ghost-button" type="button"><i class="fa-solid fa-up-right-and-down-left-from-center button-icon"></i>Expand All</button>
+                                            <button id="collapseSelectionButton" class="ghost-button" type="button"><i class="fa-solid fa-down-left-and-up-right-to-center button-icon"></i>Collapse All</button>
                                         </div>
                                     </div>
                                 </div>
@@ -154,12 +174,12 @@
                                 <div class="card-header border-0">
                                     <div class="selection-header">
                                         <div>
-                                            <h2 class="panel-title">Test results</h2>
+                                            <h2 class="panel-title"><i class="fa-solid fa-wave-square panel-title-icon"></i>Test results</h2>
                                             <p id="resultsSummary" class="panel-note mb-0">Use the controls to expand or collapse the latest results.</p>
                                         </div>
                                         <div class="selection-actions">
-                                            <button id="expandResultsButton" class="ghost-button" type="button">Expand All</button>
-                                            <button id="collapseResultsButton" class="ghost-button" type="button">Collapse All</button>
+                                            <button id="expandResultsButton" class="ghost-button" type="button"><i class="fa-solid fa-up-right-and-down-left-from-center button-icon"></i>Expand All</button>
+                                            <button id="collapseResultsButton" class="ghost-button" type="button"><i class="fa-solid fa-down-left-and-up-right-to-center button-icon"></i>Collapse All</button>
                                         </div>
                                     </div>
                                 </div>
