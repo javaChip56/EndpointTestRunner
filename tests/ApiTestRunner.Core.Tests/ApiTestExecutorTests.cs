@@ -23,7 +23,9 @@ public sealed class ApiTestExecutorTests
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["Variables:DefaultCustomerId"] = "C1001"
+                    ["Variables:DefaultCustomerId"] = "C1001",
+                    ["Variables:ExpectedCount"] = "3",
+                    ["Variables:RequireToken"] = "true"
                 })
                 .Build();
 
@@ -43,7 +45,19 @@ public sealed class ApiTestExecutorTests
 
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent("""{ "success": true }""", Encoding.UTF8, "application/json")
+                    Content = new StringContent(
+                        """
+                        {
+                          "success": true,
+                          "data": {
+                            "period": "2026-03",
+                            "items": [1, 2, 3],
+                            "token": "secret-token"
+                          }
+                        }
+                        """,
+                        Encoding.UTF8,
+                        "application/json")
                 };
             });
 
@@ -106,6 +120,21 @@ public sealed class ApiTestExecutorTests
                                             {
                                                 Field = "success",
                                                 EqualsValue = true
+                                            },
+                                            new AssertionDefinition
+                                            {
+                                                Field = "data.period",
+                                                EqualsValue = "{{var:reportYear}}-{{var:reportMonth}}"
+                                            },
+                                            new AssertionDefinition
+                                            {
+                                                Field = "data.items",
+                                                Count = "{{config:Variables.ExpectedCount}}"
+                                            },
+                                            new AssertionDefinition
+                                            {
+                                                Field = "data.token",
+                                                NotEmpty = "{{config:Variables.RequireToken}}"
                                             }
                                         ]
                                     }

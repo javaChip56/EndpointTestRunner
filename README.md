@@ -197,6 +197,7 @@ Tokens can be used in:
 - `query`
 - `headers`
 - `body`
+- assertion values
 - environment `variables`
 
 Supported token providers:
@@ -249,6 +250,7 @@ Notes:
 - A token can occupy the whole value or be embedded inside a larger string.
 - Environment variables can reference other environment variables.
 - `config:` reads from application configuration, so `config:Variables.DefaultCustomerId` maps to `Variables:DefaultCustomerId`.
+- Assertions support tokens in `field`, `equals`, `notEquals`, `type`, `containsText`, `startsWith`, `endsWith`, `contains`, `notEmpty`, `minCount`, `maxCount`, and `count`.
 
 ## Recommended split layout
 

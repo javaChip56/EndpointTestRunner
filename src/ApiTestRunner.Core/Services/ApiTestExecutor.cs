@@ -145,7 +145,7 @@ public sealed class ApiTestExecutor : IApiTestExecutor
                 }
             }
 
-            var tests = endpoint.Tests.Select(test => ExecuteTest(test, actualStatus.Value, responseJson)).ToArray();
+            var tests = endpoint.Tests.Select(test => ExecuteTest(environment, test, actualStatus.Value, responseJson)).ToArray();
 
             return new EndpointRunResult
             {
@@ -187,10 +187,36 @@ public sealed class ApiTestExecutor : IApiTestExecutor
         }
     }
 
-    private TestCaseRunResult ExecuteTest(TestDefinition test, int actualStatus, JsonNode? responseJson)
+    private TestCaseRunResult ExecuteTest(
+        EnvironmentDefinition environment,
+        TestDefinition test,
+        int actualStatus,
+        JsonNode? responseJson)
     {
+        IReadOnlyList<AssertionDefinition> resolvedAssertions;
+
+        try
+        {
+            resolvedAssertions = ResolveAssertions(test.Assertions, environment);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Failed to resolve assertion variables for test '{TestName}'", test.Name);
+
+            return new TestCaseRunResult
+            {
+                Name = test.Name,
+                ExpectedStatus = test.ExpectedStatus,
+                ActualStatus = actualStatus,
+                StatusMatched = test.ExpectedStatus == actualStatus,
+                IsSuccess = false,
+                ErrorMessage = exception.Message,
+                Assertions = []
+            };
+        }
+
         var statusMatched = test.ExpectedStatus == actualStatus;
-        var assertions = _assertionEvaluator.EvaluateAll(test.Assertions, responseJson);
+        var assertions = _assertionEvaluator.EvaluateAll(resolvedAssertions, responseJson);
 
         if (!statusMatched)
         {
@@ -225,6 +251,40 @@ public sealed class ApiTestExecutor : IApiTestExecutor
             ErrorMessage = failedMessages.Length == 0 ? null : string.Join(" ", failedMessages),
             Assertions = assertions
         };
+    }
+
+    private IReadOnlyList<AssertionDefinition> ResolveAssertions(
+        IReadOnlyList<AssertionDefinition> assertions,
+        EnvironmentDefinition environment)
+    {
+        return assertions.Select(assertion => new AssertionDefinition
+        {
+            Field = _variableResolver.ResolveRequiredString(assertion.Field, environment, "assertion field"),
+            EqualsValue = _variableResolver.ResolveValue(assertion.EqualsValue, environment),
+            NotEquals = _variableResolver.ResolveValue(assertion.NotEquals, environment),
+            Type = assertion.Type is null
+                ? null
+                : _variableResolver.ResolveRequiredString(assertion.Type, environment, "assertion type"),
+            ContainsText = assertion.ContainsText is null
+                ? null
+                : _variableResolver.ResolveRequiredString(assertion.ContainsText, environment, "assertion containsText"),
+            StartsWith = assertion.StartsWith is null
+                ? null
+                : _variableResolver.ResolveRequiredString(assertion.StartsWith, environment, "assertion startsWith"),
+            EndsWith = assertion.EndsWith is null
+                ? null
+                : _variableResolver.ResolveRequiredString(assertion.EndsWith, environment, "assertion endsWith"),
+            NotEmpty = _variableResolver.ResolveValue(assertion.NotEmpty, environment),
+            MinCount = _variableResolver.ResolveValue(assertion.MinCount, environment),
+            MaxCount = _variableResolver.ResolveValue(assertion.MaxCount, environment),
+            Count = _variableResolver.ResolveValue(assertion.Count, environment),
+            Contains = assertion.Contains.Count == 0
+                ? new Dictionary<string, object?>()
+                : assertion.Contains.ToDictionary(
+                    pair => _variableResolver.ResolveRequiredString(pair.Key, environment, "assertion contains key"),
+                    pair => _variableResolver.ResolveValue(pair.Value, environment),
+                    StringComparer.OrdinalIgnoreCase)
+        }).ToArray();
     }
 
     private HttpRequestMessage BuildRequest(

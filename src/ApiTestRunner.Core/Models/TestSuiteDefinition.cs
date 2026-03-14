@@ -72,13 +72,13 @@ public sealed record class AssertionDefinition
 
     public string? EndsWith { get; init; }
 
-    public bool? NotEmpty { get; init; }
+    public object? NotEmpty { get; init; }
 
-    public int? MinCount { get; init; }
+    public object? MinCount { get; init; }
 
-    public int? MaxCount { get; init; }
+    public object? MaxCount { get; init; }
 
-    public int? Count { get; init; }
+    public object? Count { get; init; }
 
     public Dictionary<string, object?> Contains { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 }

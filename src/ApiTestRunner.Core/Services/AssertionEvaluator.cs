@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using ApiTestRunner.Core.Models;
 
@@ -150,70 +151,114 @@ public sealed class AssertionEvaluator : IAssertionEvaluator
                         : $"'{actualText}' did not end with '{expectedSuffix}'."));
         }
 
-        if (assertion.NotEmpty.HasValue)
+        if (assertion.NotEmpty is not null)
         {
             rulesAdded++;
-            var success = assertion.NotEmpty.Value ? IsNotEmpty(actualNode) : !IsNotEmpty(actualNode);
-            var expectation = assertion.NotEmpty.Value ? "notEmpty=true" : "notEmpty=false";
+            if (!TryConvertToBoolean(assertion.NotEmpty, out var expectedNotEmpty))
+            {
+                results.Add(CreateResult(
+                    assertion.Field,
+                    "notEmpty",
+                    false,
+                    "notEmpty must resolve to true or false."));
+            }
+            else
+            {
+                var success = expectedNotEmpty ? IsNotEmpty(actualNode) : !IsNotEmpty(actualNode);
+                var expectation = expectedNotEmpty ? "notEmpty=true" : "notEmpty=false";
 
-            results.Add(CreateResult(
-                assertion.Field,
-                "notEmpty",
-                success,
-                success
-                    ? $"Field satisfied {expectation}."
-                    : $"Field did not satisfy {expectation}."));
+                results.Add(CreateResult(
+                    assertion.Field,
+                    "notEmpty",
+                    success,
+                    success
+                        ? $"Field satisfied {expectation}."
+                        : $"Field did not satisfy {expectation}."));
+            }
         }
 
-        if (assertion.MinCount.HasValue)
+        if (assertion.MinCount is not null)
         {
             rulesAdded++;
-            var count = GetArrayCount(actualNode);
-            var success = count.HasValue && count.Value >= assertion.MinCount.Value;
+            if (!TryConvertToInteger(assertion.MinCount, out var minCount))
+            {
+                results.Add(CreateResult(
+                    assertion.Field,
+                    "minCount",
+                    false,
+                    "minCount must resolve to an integer."));
+            }
+            else
+            {
+                var count = GetArrayCount(actualNode);
+                var success = count.HasValue && count.Value >= minCount;
 
-            results.Add(CreateResult(
-                assertion.Field,
-                "minCount",
-                success,
-                success
-                    ? $"Array count was at least {assertion.MinCount.Value}."
-                    : count.HasValue
-                        ? $"Array count was {count.Value}, expected at least {assertion.MinCount.Value}."
-                        : "Field was not an array."));
+                results.Add(CreateResult(
+                    assertion.Field,
+                    "minCount",
+                    success,
+                    success
+                        ? $"Array count was at least {minCount}."
+                        : count.HasValue
+                            ? $"Array count was {count.Value}, expected at least {minCount}."
+                            : "Field was not an array."));
+            }
         }
 
-        if (assertion.MaxCount.HasValue)
+        if (assertion.MaxCount is not null)
         {
             rulesAdded++;
-            var count = GetArrayCount(actualNode);
-            var success = count.HasValue && count.Value <= assertion.MaxCount.Value;
+            if (!TryConvertToInteger(assertion.MaxCount, out var maxCount))
+            {
+                results.Add(CreateResult(
+                    assertion.Field,
+                    "maxCount",
+                    false,
+                    "maxCount must resolve to an integer."));
+            }
+            else
+            {
+                var count = GetArrayCount(actualNode);
+                var success = count.HasValue && count.Value <= maxCount;
 
-            results.Add(CreateResult(
-                assertion.Field,
-                "maxCount",
-                success,
-                success
-                    ? $"Array count was at most {assertion.MaxCount.Value}."
-                    : count.HasValue
-                        ? $"Array count was {count.Value}, expected at most {assertion.MaxCount.Value}."
-                        : "Field was not an array."));
+                results.Add(CreateResult(
+                    assertion.Field,
+                    "maxCount",
+                    success,
+                    success
+                        ? $"Array count was at most {maxCount}."
+                        : count.HasValue
+                            ? $"Array count was {count.Value}, expected at most {maxCount}."
+                            : "Field was not an array."));
+            }
         }
 
-        if (assertion.Count.HasValue)
+        if (assertion.Count is not null)
         {
             rulesAdded++;
-            var count = GetArrayCount(actualNode);
-            var success = count.HasValue && count.Value == assertion.Count.Value;
+            if (!TryConvertToInteger(assertion.Count, out var expectedCount))
+            {
+                results.Add(CreateResult(
+                    assertion.Field,
+                    "count",
+                    false,
+                    "count must resolve to an integer."));
+            }
+            else
+            {
+                var count = GetArrayCount(actualNode);
+                var success = count.HasValue && count.Value == expectedCount;
 
-            results.Add(CreateResult(
-                assertion.Field,
-                "count",
-                success,
-                success
-                    ? $"Array count matched {assertion.Count.Value}."
-                    : count.HasValue
-                        ? $"Array count was {count.Value}, expected {assertion.Count.Value}."
-                        : "Field was not an array."));
+                results.Add(CreateResult(
+                    assertion.Field,
+                    "count",
+                    success,
+                    success
+                        ? $"Array count matched {expectedCount}."
+                        : count.HasValue
+                            ? $"Array count was {count.Value}, expected {expectedCount}."
+                            : "Field was not an array."));
+            }
         }
 
         if (assertion.Contains.Count > 0)
@@ -328,5 +373,46 @@ public sealed class AssertionEvaluator : IAssertionEvaluator
     private static string FormatNode(JsonNode? node)
     {
         return node?.ToJsonString() ?? "null";
+    }
+
+    private static bool TryConvertToBoolean(object? value, out bool result)
+    {
+        switch (value)
+        {
+            case bool boolean:
+                result = boolean;
+                return true;
+            case string text when bool.TryParse(text, out var parsed):
+                result = parsed;
+                return true;
+            default:
+                result = false;
+                return false;
+        }
+    }
+
+    private static bool TryConvertToInteger(object? value, out int result)
+    {
+        switch (value)
+        {
+            case int number:
+                result = number;
+                return true;
+            case long number when number is >= int.MinValue and <= int.MaxValue:
+                result = (int)number;
+                return true;
+            case double number when number >= int.MinValue && number <= int.MaxValue && Math.Abs(number % 1) < double.Epsilon:
+                result = (int)number;
+                return true;
+            case decimal number when number >= int.MinValue && number <= int.MaxValue && decimal.Truncate(number) == number:
+                result = (int)number;
+                return true;
+            case string text when int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed):
+                result = parsed;
+                return true;
+            default:
+                result = 0;
+                return false;
+        }
     }
 }
