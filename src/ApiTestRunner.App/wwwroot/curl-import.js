@@ -42,7 +42,7 @@ let assertionDrafts = [];
 async function analyzeCurlCommand() {
     const command = curlInput.value.trim();
     if (!command) {
-        renderStatus("Paste a cURL command first.");
+        renderStatus("Paste a cURL command first.", true);
         return;
     }
 
@@ -66,15 +66,19 @@ async function analyzeCurlCommand() {
         });
 
         if (!response.ok) {
-            throw new Error(`Analyze request failed with status ${response.status}`);
+            throw new Error(await buildErrorMessage(response, "Analyze request failed"));
         }
 
         const result = await response.json();
         renderResult(result);
-        renderStatus("Analysis completed.");
+        renderStatus(
+            result.warnings && result.warnings.length > 0
+                ? "Analysis completed with warnings."
+                : "Analysis completed.",
+            false);
     } catch (error) {
         analysisContainer.innerHTML = "";
-        renderStatus(error.message || "Unable to analyze the provided cURL command.");
+        renderStatus(error.message || "Unable to analyze the provided cURL command.", true);
     } finally {
         setBusy(false);
     }
@@ -87,7 +91,7 @@ function parseResponseBody() {
         parsedResponseObject = null;
         assertionDrafts = [];
         renderAssertionBuilder();
-        responseStatus.textContent = "No response body parsed yet.";
+        renderResponseStatus("No response body parsed yet.", false);
         return;
     }
 
@@ -96,13 +100,13 @@ function parseResponseBody() {
         parsedResponseFields = collectResponseFields(parsedResponseObject);
         assertionDrafts = [];
         renderAssertionBuilder();
-        responseStatus.textContent = `${parsedResponseFields.length} selectable fields detected.`;
+        renderResponseStatus(`${parsedResponseFields.length} selectable fields detected.`, false);
     } catch (error) {
         parsedResponseFields = [];
         parsedResponseObject = null;
         assertionDrafts = [];
         renderAssertionBuilder();
-        responseStatus.textContent = error.message || "Response body is not valid JSON.";
+        renderResponseStatus(error.message || "Response body is not valid JSON.", true);
     }
 }
 
@@ -275,7 +279,7 @@ function addAssertionDraft() {
     const rule = assertionRuleSelect.value;
 
     if (!field || !rule) {
-        responseStatus.textContent = "Parse a response body and choose a field first.";
+        renderResponseStatus("Parse a response body and choose a field first.", true);
         return;
     }
 
@@ -362,9 +366,31 @@ function renderAssertionDrafts() {
 function renderResult(result) {
     analysisContainer.innerHTML = "";
 
+    if (result.warnings && result.warnings.length > 0) {
+        analysisContainer.appendChild(renderWarningCard(result.warnings));
+    }
+
     analysisContainer.appendChild(renderRequestCard(result.request));
     analysisContainer.appendChild(renderEnvironmentCard(result.environment));
     analysisContainer.appendChild(renderEndpointCard(result.endpoint));
+}
+
+function renderWarningCard(warnings) {
+    const card = document.createElement("section");
+    card.className = "preview-card warning-card";
+    card.innerHTML = "<h2>Warnings</h2><p class=\"result-note\">The analyzer continued with generated suggestions even though the configured YAML suite could not be loaded fully.</p>";
+
+    const list = document.createElement("ul");
+    list.className = "warning-list";
+
+    warnings.forEach((warning) => {
+        const item = document.createElement("li");
+        item.textContent = warning;
+        list.appendChild(item);
+    });
+
+    card.appendChild(list);
+    return card;
 }
 
 function renderRequestCard(request) {
@@ -530,8 +556,14 @@ function getJsonValueType(value) {
     }
 }
 
-function renderStatus(message) {
+function renderStatus(message, isError) {
     analyzeStatus.textContent = message;
+    analyzeStatus.classList.toggle("status-error", Boolean(isError));
+}
+
+function renderResponseStatus(message, isError) {
+    responseStatus.textContent = message;
+    responseStatus.classList.toggle("status-error", Boolean(isError));
 }
 
 function setBusy(isBusy) {
@@ -539,6 +571,23 @@ function setBusy(isBusy) {
     parseResponseButton.disabled = isBusy;
     addAssertionButton.disabled = isBusy || parsedResponseFields.length === 0;
     analyzeButton.textContent = isBusy ? "Analyzing..." : "Analyze Command";
+}
+
+async function buildErrorMessage(response, fallbackMessage) {
+    try {
+        const payload = await response.json();
+        if (payload && typeof payload.error === "string" && payload.error.trim()) {
+            return payload.error;
+        }
+
+        if (payload && typeof payload.title === "string" && payload.title.trim()) {
+            return payload.title;
+        }
+    } catch {
+        // Fall back below.
+    }
+
+    return `${fallbackMessage} with status ${response.status}`;
 }
 
 function escapeHtml(value) {

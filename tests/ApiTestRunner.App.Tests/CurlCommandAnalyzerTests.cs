@@ -148,6 +148,25 @@ public sealed class CurlCommandAnalyzerTests
         Assert.Contains("notEmpty: true", result.Endpoint.SuggestedYaml);
     }
 
+    [Fact]
+    public async Task AnalyzeAsync_ReturnsWarningsAndSuggestionsWhenYamlFilesAreMissing()
+    {
+        var analyzer = new CurlCommandAnalyzer(new ThrowingConfiguredTestSuiteProvider(
+            new InvalidOperationException("Glob pattern '../../gwm4-api-dev/Endpoints/**/*.yaml' did not match any files.")));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            Command = "curl --request POST \"https://api.partner.com/AccountHoldingsMgmt/GetAccountList\""
+        });
+
+        Assert.NotEmpty(result.Warnings);
+        Assert.Contains("did not match any files", result.Warnings[0]);
+        Assert.False(result.Environment.Exists);
+        Assert.False(result.Endpoint.Exists);
+        Assert.NotNull(result.Environment.SuggestedYaml);
+        Assert.NotNull(result.Endpoint.SuggestedYaml);
+    }
+
     private sealed class StubConfiguredTestSuiteProvider : IConfiguredTestSuiteProvider
     {
         private readonly ApiTestSuiteDefinition _suite;
@@ -160,6 +179,21 @@ public sealed class CurlCommandAnalyzerTests
         public Task<LoadedTestSuite> LoadAsync(CancellationToken cancellationToken = default)
         {
             return Task.FromResult(new LoadedTestSuite(_suite, []));
+        }
+    }
+
+    private sealed class ThrowingConfiguredTestSuiteProvider : IConfiguredTestSuiteProvider
+    {
+        private readonly Exception _exception;
+
+        public ThrowingConfiguredTestSuiteProvider(Exception exception)
+        {
+            _exception = exception;
+        }
+
+        public Task<LoadedTestSuite> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromException<LoadedTestSuite>(_exception);
         }
     }
 }

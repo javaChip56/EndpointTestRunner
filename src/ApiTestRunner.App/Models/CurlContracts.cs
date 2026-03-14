@@ -16,6 +16,8 @@ public sealed class CurlAnalyzeResponse
     public CurlEnvironmentAnalysis Environment { get; init; } = new();
 
     public CurlEndpointAnalysis Endpoint { get; init; } = new();
+
+    public IReadOnlyList<string> Warnings { get; init; } = [];
 }
 
 public sealed class CurlRequestSummary

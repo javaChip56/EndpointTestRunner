@@ -8,6 +8,8 @@
     --line: rgba(31, 41, 51, 0.1);
     --accent: #0f766e;
     --accent-soft: rgba(15, 118, 110, 0.12);
+    --warn: #b54708;
+    --warn-soft: rgba(181, 71, 8, 0.12);
     --fail: #b42318;
     --fail-soft: rgba(180, 35, 24, 0.12);
     --pass: #147d64;
@@ -181,6 +183,24 @@ button:disabled {
 .result-summary,
 .result-note {
     color: var(--muted);
+}
+
+.status-error {
+    color: var(--fail);
+    font-weight: 700;
+}
+
+.warning-card {
+    border-color: rgba(181, 71, 8, 0.18);
+    background: linear-gradient(180deg, rgba(255, 248, 235, 0.96), rgba(255, 250, 240, 0.88));
+}
+
+.warning-list {
+    margin: 0.9rem 0 0;
+    padding-left: 1.2rem;
+    color: var(--warn);
+    display: grid;
+    gap: 0.45rem;
 }
 
 .selection-tree {

@@ -32,7 +32,7 @@ const resultExpansionState = {
 async function fetchState() {
     const response = await fetch("/api/dashboard/state", { cache: "no-store" });
     if (!response.ok) {
-        throw new Error(`Dashboard request failed with status ${response.status}`);
+        throw new Error(await buildErrorMessage(response, "Dashboard request failed"));
     }
 
     return response.json();
@@ -41,7 +41,7 @@ async function fetchState() {
 async function fetchManifest() {
     const response = await fetch("/api/dashboard/manifest", { cache: "no-store" });
     if (!response.ok) {
-        throw new Error(`Manifest request failed with status ${response.status}`);
+        throw new Error(await buildErrorMessage(response, "Manifest request failed"));
     }
 
     return response.json();
@@ -90,7 +90,7 @@ async function runSuite() {
         });
 
         if (!response.ok) {
-            throw new Error(`Run request failed with status ${response.status}`);
+            throw new Error(await buildErrorMessage(response, "Run request failed"));
         }
 
         const state = await response.json();
@@ -213,8 +213,11 @@ function createSelectionHeader(title, detail, childTestIds, onToggle) {
     checkbox.type = "checkbox";
     checkbox.checked = childTestIds.every((testId) => selectedTestIds.has(testId));
     checkbox.indeterminate = !checkbox.checked && childTestIds.some((testId) => selectedTestIds.has(testId));
-    checkbox.addEventListener("click", (event) => event.stopPropagation());
-    checkbox.addEventListener("change", () => onToggle(childTestIds, checkbox.checked));
+    checkbox.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onToggle(childTestIds, !checkbox.checked);
+    });
 
     const labelStack = document.createElement("span");
     labelStack.className = "selection-label-stack";
@@ -256,6 +259,7 @@ function getAllTestIds(manifest) {
 function renderState(state) {
     lastRunState = state;
     const run = state.lastRun;
+    setStatusError(Boolean(state.lastError));
 
     document.getElementById("runStatus").textContent = buildStatusText(state);
     document.getElementById("startedAt").textContent = `Started: ${formatDate(state.lastStartedAtUtc)}`;
@@ -427,6 +431,7 @@ function buildStatusText(state) {
 }
 
 function renderError(error) {
+    setStatusError(true);
     document.getElementById("runStatus").textContent = error.message || "An unexpected dashboard error occurred.";
 }
 
@@ -436,6 +441,23 @@ function formatDate(value) {
     }
 
     return new Date(value).toLocaleString();
+}
+
+async function buildErrorMessage(response, fallbackMessage) {
+    try {
+        const payload = await response.json();
+        if (payload && typeof payload.error === "string" && payload.error.trim()) {
+            return payload.error;
+        }
+
+        if (payload && typeof payload.title === "string" && payload.title.trim()) {
+            return payload.title;
+        }
+    } catch {
+        // Fall back to a generic message below.
+    }
+
+    return `${fallbackMessage} with status ${response.status}`;
 }
 
 function setBusy(isBusy) {
@@ -456,6 +478,10 @@ function updateSelectionButtons(isEnabled) {
 function updateResultButtons(isEnabled) {
     expandResultsButton.disabled = !isEnabled;
     collapseResultsButton.disabled = !isEnabled;
+}
+
+function setStatusError(hasError) {
+    document.getElementById("runStatus").classList.toggle("status-error", hasError);
 }
 
 function getResultEnvironmentKey(environment) {

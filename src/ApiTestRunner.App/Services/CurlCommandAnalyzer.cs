@@ -40,7 +40,8 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
         }
 
         var parsedRequest = ParseCurlCommand(request.Command);
-        var loadedSuite = await _suiteProvider.LoadAsync(cancellationToken);
+        var warnings = new List<string>();
+        var loadedSuite = await TryLoadSuiteAsync(warnings, cancellationToken);
 
         var matchedEnvironmentInfos = loadedSuite.Suite.Environments
             .Select(environment => TryMatchEnvironment(environment, parsedRequest.Url))
@@ -122,8 +123,24 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
                         effectivePath,
                         targetEnvironmentNames,
                         request.Assertions)
-            }
+            },
+            Warnings = warnings
         };
+    }
+
+    private async Task<LoadedTestSuite> TryLoadSuiteAsync(
+        ICollection<string> warnings,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _suiteProvider.LoadAsync(cancellationToken);
+        }
+        catch (Exception exception) when (IsMissingYamlConfigurationException(exception))
+        {
+            warnings.Add($"Warning: {exception.Message}");
+            return new LoadedTestSuite(new ApiTestSuiteDefinition(), []);
+        }
     }
 
     private static CurlRequestSummary ParseCurlCommand(string command)
@@ -736,6 +753,14 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
             .ToLowerInvariant();
 
         return string.IsNullOrWhiteSpace(normalized) ? "generated" : normalized;
+    }
+
+    private static bool IsMissingYamlConfigurationException(Exception exception)
+    {
+        return exception is FileNotFoundException or DirectoryNotFoundException ||
+               exception is InvalidOperationException invalidOperationException &&
+               (invalidOperationException.Message.Contains("did not match any files", StringComparison.OrdinalIgnoreCase) ||
+                invalidOperationException.Message.Contains("No YAML test files were configured", StringComparison.OrdinalIgnoreCase));
     }
 
     private sealed record EnvironmentMatch(EnvironmentDefinition Environment, string RelativePath);
