@@ -395,10 +395,28 @@ public sealed class AssertionEvaluator : IAssertionEvaluator
     {
         switch (value)
         {
+            case sbyte number:
+                result = number;
+                return true;
+            case byte number:
+                result = number;
+                return true;
+            case short number:
+                result = number;
+                return true;
+            case ushort number:
+                result = number;
+                return true;
             case int number:
                 result = number;
                 return true;
+            case uint number when number <= int.MaxValue:
+                result = (int)number;
+                return true;
             case long number when number is >= int.MinValue and <= int.MaxValue:
+                result = (int)number;
+                return true;
+            case ulong number when number <= int.MaxValue:
                 result = (int)number;
                 return true;
             case double number when number >= int.MinValue && number <= int.MaxValue && Math.Abs(number % 1) < double.Epsilon:

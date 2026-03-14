@@ -89,4 +89,42 @@ public sealed class AssertionEvaluatorTests
         Assert.NotEmpty(results);
         Assert.All(results, result => Assert.True(result.IsSuccess, result.Message));
     }
+
+    [Fact]
+    public void EvaluateAll_AcceptsYamlSizedIntegralTypesForCountAssertions()
+    {
+        var response = JsonNode.Parse("""
+            {
+              "data": {
+                "pagenationTemplate": {
+                  "dataLists": [1, 2, 3]
+                }
+              }
+            }
+            """);
+
+        var assertions = new[]
+        {
+            new AssertionDefinition
+            {
+                Field = "data.pagenationTemplate.dataLists",
+                MinCount = (byte)1
+            },
+            new AssertionDefinition
+            {
+                Field = "data.pagenationTemplate.dataLists",
+                MaxCount = (ushort)5
+            },
+            new AssertionDefinition
+            {
+                Field = "data.pagenationTemplate.dataLists",
+                Count = (uint)3
+            }
+        };
+
+        var results = _evaluator.EvaluateAll(assertions, response);
+
+        Assert.NotEmpty(results);
+        Assert.All(results, result => Assert.True(result.IsSuccess, result.Message));
+    }
 }
