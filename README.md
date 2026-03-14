@@ -185,6 +185,71 @@ assertions:
       status: Active
 ```
 
+## Dynamic parameters and variables
+
+The runner supports token-based variable resolution for request values, so YAML does not need to hard-code values like month, year, dates, secrets, or shared IDs.
+
+Tokens can be used in:
+
+- `baseUrl`
+- `path`
+- `pathParams`
+- `query`
+- `headers`
+- `body`
+- environment `variables`
+
+Supported token providers:
+
+- `{{now:FORMAT}}`
+- `{{now:OFFSET:FORMAT}}`
+- `{{today:FORMAT}}`
+- `{{today:OFFSET:FORMAT}}`
+- `{{var:VariableName}}`
+- `{{env:ENVIRONMENT_VARIABLE_NAME}}`
+- `{{config:Configuration.Key}}`
+
+Supported date offset units:
+
+- `d` for days
+- `M` for months
+- `y` for years
+- `h` for hours
+- `m` for minutes
+
+Examples:
+
+```yaml
+environments:
+  - name: UAT
+    baseUrl: https://api.company.com
+    variables:
+      reportYear: "{{now:yyyy}}"
+      reportMonth: "{{now:MM}}"
+
+endpoints:
+  - name: Monthly Report
+    method: POST
+    path: /api/reports/{customerId}
+    pathParams:
+      customerId: "{{config:Variables.DefaultCustomerId}}"
+    query:
+      month: "{{var:reportMonth}}"
+      year: "{{var:reportYear}}"
+      previousDay: "{{today:-1d:yyyy-MM-dd}}"
+    headers:
+      Authorization: Bearer {{env:API_TOKEN}}
+    body:
+      period: "{{var:reportYear}}-{{var:reportMonth}}"
+      generatedOn: "{{today:yyyy-MM-dd}}"
+```
+
+Notes:
+
+- A token can occupy the whole value or be embedded inside a larger string.
+- Environment variables can reference other environment variables.
+- `config:` reads from application configuration, so `config:Variables.DefaultCustomerId` maps to `Variables:DefaultCustomerId`.
+
 ## Recommended split layout
 
 ```text

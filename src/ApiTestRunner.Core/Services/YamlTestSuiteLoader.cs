@@ -110,6 +110,14 @@ public sealed class YamlTestSuiteLoader : IYamlTestSuiteLoader
             throw new InvalidOperationException($"Environment '{environment.Name}' in '{filePath}' is missing a baseUrl.");
         }
 
+        foreach (var variable in environment.Variables)
+        {
+            if (string.IsNullOrWhiteSpace(variable.Key))
+            {
+                throw new InvalidOperationException($"Environment '{environment.Name}' in '{filePath}' has a variable with an empty name.");
+            }
+        }
+
         foreach (var endpoint in environment.Endpoints)
         {
             ValidateEndpoint(endpoint, environment.Name, filePath);
@@ -163,8 +171,15 @@ public sealed class YamlTestSuiteLoader : IYamlTestSuiteLoader
                 $"Existing: '{existingEnvironment.BaseUrl}', incoming: '{incomingEnvironment.BaseUrl}'.");
         }
 
+        var mergedVariables = new Dictionary<string, object?>(existingEnvironment.Variables, StringComparer.OrdinalIgnoreCase);
+        foreach (var variable in incomingEnvironment.Variables)
+        {
+            mergedVariables[variable.Key] = variable.Value;
+        }
+
         environmentsByName[incomingEnvironment.Name] = existingEnvironment with
         {
+            Variables = mergedVariables,
             Endpoints = [.. existingEnvironment.Endpoints, .. incomingEnvironment.Endpoints.Select(CloneEndpoint)]
         };
     }
@@ -213,6 +228,7 @@ public sealed class YamlTestSuiteLoader : IYamlTestSuiteLoader
     {
         return environment with
         {
+            Variables = new Dictionary<string, object?>(environment.Variables, StringComparer.OrdinalIgnoreCase),
             Endpoints = environment.Endpoints.Select(CloneEndpoint).ToList()
         };
     }

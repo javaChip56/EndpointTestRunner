@@ -27,15 +27,18 @@ public sealed class ApiTestExecutor : IApiTestExecutor
 
     private readonly HttpClient _httpClient;
     private readonly IAssertionEvaluator _assertionEvaluator;
+    private readonly IVariableResolver _variableResolver;
     private readonly ILogger<ApiTestExecutor> _logger;
 
     public ApiTestExecutor(
         HttpClient httpClient,
         IAssertionEvaluator assertionEvaluator,
+        IVariableResolver variableResolver,
         ILogger<ApiTestExecutor> logger)
     {
         _httpClient = httpClient;
         _assertionEvaluator = assertionEvaluator;
+        _variableResolver = variableResolver;
         _logger = logger;
     }
 
@@ -224,15 +227,16 @@ public sealed class ApiTestExecutor : IApiTestExecutor
         };
     }
 
-    private static HttpRequestMessage BuildRequest(
+    private HttpRequestMessage BuildRequest(
         EnvironmentDefinition environment,
         EndpointDefinition endpoint,
         out string requestUrl,
         out string? requestBody)
     {
-        if (!Uri.TryCreate(environment.BaseUrl, UriKind.Absolute, out var baseUri))
+        var resolvedBaseUrl = _variableResolver.ResolveRequiredString(environment.BaseUrl, environment, "baseUrl");
+        if (!Uri.TryCreate(resolvedBaseUrl, UriKind.Absolute, out var baseUri))
         {
-            throw new InvalidOperationException($"Environment '{environment.Name}' has an invalid baseUrl: {environment.BaseUrl}");
+            throw new InvalidOperationException($"Environment '{environment.Name}' has an invalid baseUrl: {resolvedBaseUrl}");
         }
 
         var normalizedMethod = endpoint.Method.ToUpperInvariant();
@@ -242,7 +246,7 @@ public sealed class ApiTestExecutor : IApiTestExecutor
                 $"Endpoint '{endpoint.Name}' uses unsupported HTTP method '{endpoint.Method}'. Supported methods: GET, POST, PUT, PATCH, DELETE.");
         }
 
-        var resolvedPath = ResolvePath(endpoint.Path, endpoint.PathParams);
+        var resolvedPath = ResolvePath(endpoint.Path, endpoint.PathParams, environment);
         var combinedUri = new Uri(baseUri, resolvedPath);
 
         if (endpoint.Query.Count > 0)
@@ -251,7 +255,7 @@ public sealed class ApiTestExecutor : IApiTestExecutor
 
             foreach (var pair in endpoint.Query)
             {
-                query[pair.Key] = ConvertToString(pair.Value);
+                query[pair.Key] = ConvertToString(_variableResolver.ResolveValue(pair.Value, environment));
             }
 
             requestUrl = QueryHelpers.AddQueryString(combinedUri.ToString(), query);
@@ -267,30 +271,34 @@ public sealed class ApiTestExecutor : IApiTestExecutor
 
         if (endpoint.Body is not null)
         {
-            requestBody = JsonNodeConversion.ToJsonNode(endpoint.Body)?.ToJsonString(SerializerOptions) ?? "null";
+            var resolvedBody = _variableResolver.ResolveValue(endpoint.Body, environment);
+            requestBody = JsonNodeConversion.ToJsonNode(resolvedBody)?.ToJsonString(SerializerOptions) ?? "null";
             request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
         }
 
         foreach (var header in endpoint.Headers)
         {
-            if (!request.Headers.TryAddWithoutValidation(header.Key, header.Value))
+            var resolvedHeaderValue = _variableResolver.ResolveRequiredString(header.Value, environment, $"header '{header.Key}'");
+
+            if (!request.Headers.TryAddWithoutValidation(header.Key, resolvedHeaderValue))
             {
                 request.Content ??= new StringContent(string.Empty);
-                request.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                request.Content.Headers.TryAddWithoutValidation(header.Key, resolvedHeaderValue);
             }
         }
 
         return request;
     }
 
-    private static string ResolvePath(string path, IReadOnlyDictionary<string, object?> pathParams)
+    private string ResolvePath(string path, IReadOnlyDictionary<string, object?> pathParams, EnvironmentDefinition environment)
     {
-        var resolvedPath = path;
+        var resolvedPath = _variableResolver.ResolveRequiredString(path, environment, "path");
 
         foreach (var pathParam in pathParams)
         {
             var token = $"{{{pathParam.Key}}}";
-            resolvedPath = resolvedPath.Replace(token, Uri.EscapeDataString(ConvertToString(pathParam.Value)), StringComparison.Ordinal);
+            var resolvedPathParam = _variableResolver.ResolveValue(pathParam.Value, environment);
+            resolvedPath = resolvedPath.Replace(token, Uri.EscapeDataString(ConvertToString(resolvedPathParam)), StringComparison.Ordinal);
         }
 
         return resolvedPath;

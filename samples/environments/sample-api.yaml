@@ -1,6 +1,12 @@
 environments:
   - name: Local
     baseUrl: http://localhost:5005
+    variables:
+      reportYear: "{{now:yyyy}}"
+      reportMonth: "{{now:MM}}"
 
   - name: Local Canary
     baseUrl: http://localhost:5005
+    variables:
+      reportYear: "{{now:yyyy}}"
+      reportMonth: "{{now:MM}}"

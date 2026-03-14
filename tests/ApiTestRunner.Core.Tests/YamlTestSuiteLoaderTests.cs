@@ -22,6 +22,8 @@ public sealed class YamlTestSuiteLoaderTests : IDisposable
             environments:
               - name: Local
                 baseUrl: https://localhost:7001
+                variables:
+                  reportMonth: "{{now:MM}}"
             """);
 
         var endpointFile = WriteYaml("accounts.yaml", """
@@ -42,6 +44,7 @@ public sealed class YamlTestSuiteLoaderTests : IDisposable
         var environment = Assert.Single(suite.Environments);
         Assert.Equal("Local", environment.Name);
         Assert.Equal("https://localhost:7001", environment.BaseUrl);
+        Assert.Equal("{{now:MM}}", environment.Variables["reportMonth"]);
 
         var endpoint = Assert.Single(environment.Endpoints);
         Assert.Equal("Get Accounts", endpoint.Name);

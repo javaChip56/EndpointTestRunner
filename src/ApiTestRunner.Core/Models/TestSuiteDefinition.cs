@@ -22,6 +22,8 @@ public sealed record class EnvironmentDefinition
 
     public string BaseUrl { get; init; } = string.Empty;
 
+    public Dictionary<string, object?> Variables { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
     public List<EndpointDefinition> Endpoints { get; init; } = [];
 }
 

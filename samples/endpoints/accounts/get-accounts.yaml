@@ -9,6 +9,8 @@ endpoints:
       customerId: C1001
       page: 1
       pageSize: 50
+      month: "{{var:reportMonth}}"
+      year: "{{var:reportYear}}"
     tests:
       - name: Accounts should exist
         expectedStatus: 200
