@@ -82,6 +82,37 @@ public sealed class YamlTestSuiteLoaderTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadAsync_SkipsEmptyEndpointFileAndLoadsOtherConfiguredFiles()
+    {
+        var environmentFile = WriteYaml("environment.yaml", """
+            environments:
+              - name: Local
+                baseUrl: https://localhost:7001
+            """);
+
+        var emptyEndpointFile = WriteYaml("empty-endpoint.yaml", "");
+
+        var endpointFile = WriteYaml("accounts.yaml", """
+            targetEnvironments:
+              - Local
+
+            endpoints:
+              - name: Get Accounts
+                method: GET
+                path: /api/accounts
+                tests:
+                  - name: Accounts should exist
+                    expectedStatus: 200
+            """);
+
+        var suite = await _loader.LoadAsync([environmentFile, emptyEndpointFile, endpointFile]);
+
+        var environment = Assert.Single(suite.Environments);
+        var endpoint = Assert.Single(environment.Endpoints);
+        Assert.Equal("Get Accounts", endpoint.Name);
+    }
+
+    [Fact]
     public async Task LoadAsync_ThrowsForConflictingEnvironmentBaseUrls()
     {
         var firstFile = WriteYaml("local-a.yaml", """

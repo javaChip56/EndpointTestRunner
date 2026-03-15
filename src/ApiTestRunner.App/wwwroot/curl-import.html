@@ -100,7 +100,11 @@
                                     </div>
                                 </div>
                                 <div class="card-body pt-0">
-                                    <textarea id="responseBodyInput" class="tool-input" spellcheck="false" placeholder="{&quot;statusCode&quot;:1,&quot;data&quot;:{&quot;items&quot;:[1,2,3]}}"></textarea>
+                                    <div class="tool-actions response-preview-actions">
+                                        <button id="formatResponseButton" class="ghost-button inline-button" type="button"><i class="fa-solid fa-code button-icon"></i>Format JSON</button>
+                                        <button id="toggleResponseWrapButton" class="ghost-button inline-button" type="button"><i class="fa-solid fa-text-width button-icon"></i>Disable Wrap</button>
+                                    </div>
+                                    <textarea id="responseBodyInput" class="tool-input response-preview-input is-wrapped" spellcheck="false" wrap="soft" placeholder="{&quot;statusCode&quot;:1,&quot;data&quot;:{&quot;items&quot;:[1,2,3]}}"></textarea>
                                     <p id="responseStatus" class="result-summary mb-0">No response body parsed yet.</p>
                                 </div>
                             </section>

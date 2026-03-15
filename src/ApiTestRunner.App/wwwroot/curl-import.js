@@ -4,6 +4,8 @@ const responseStatus = document.getElementById("responseStatus");
 const addAssertionButton = document.getElementById("addAssertionButton");
 const curlInput = document.getElementById("curlInput");
 const responseBodyInput = document.getElementById("responseBodyInput");
+const formatResponseButton = document.getElementById("formatResponseButton");
+const toggleResponseWrapButton = document.getElementById("toggleResponseWrapButton");
 const assertionFieldSelect = document.getElementById("assertionFieldSelect");
 const assertionRuleSelect = document.getElementById("assertionRuleSelect");
 const assertionValueContainer = document.getElementById("assertionValueContainer");
@@ -38,6 +40,7 @@ let parsedResponseFields = [];
 let parsedResponseObject = null;
 let assertionDrafts = [];
 let lastParsedResponseBody = "";
+let isResponseWrapped = true;
 
 async function analyzeCurlCommand() {
     const command = curlInput.value.trim();
@@ -118,6 +121,33 @@ function parseResponseBody() {
         renderAssertionBuilder();
         renderResponseStatus(error.message || "Response body is not valid JSON.", true);
     }
+}
+
+function formatResponseBody() {
+    const responseBody = responseBodyInput.value.trim();
+    if (!responseBody) {
+        renderResponseStatus("Paste a response body first.", true);
+        return;
+    }
+
+    try {
+        const parsed = JSON.parse(responseBody);
+        responseBodyInput.value = JSON.stringify(parsed, null, 2);
+        parseResponseBody();
+        renderResponseStatus("Response body formatted.", false);
+    } catch (error) {
+        renderResponseStatus(error.message || "Response body is not valid JSON.", true);
+    }
+}
+
+function toggleResponseWrap() {
+    isResponseWrapped = !isResponseWrapped;
+    responseBodyInput.wrap = isResponseWrapped ? "soft" : "off";
+    responseBodyInput.classList.toggle("is-wrapped", isResponseWrapped);
+    responseBodyInput.classList.toggle("is-unwrapped", !isResponseWrapped);
+    toggleResponseWrapButton.innerHTML = isResponseWrapped
+        ? "<i class=\"fa-solid fa-text-width button-icon\"></i>Disable Wrap"
+        : "<i class=\"fa-solid fa-align-left button-icon\"></i>Enable Wrap";
 }
 
 function collectResponseFields(value, path = "") {
@@ -617,6 +647,8 @@ function renderResponseStatus(message, isError) {
 function setBusy(isBusy) {
     analyzeButton.disabled = isBusy;
     addAssertionButton.disabled = isBusy || parsedResponseFields.length === 0;
+    formatResponseButton.disabled = isBusy;
+    toggleResponseWrapButton.disabled = isBusy;
     analyzeButton.innerHTML = isBusy
         ? "<i class=\"fa-solid fa-spinner fa-spin button-icon\"></i>Analyzing..."
         : "<i class=\"fa-solid fa-wand-magic-sparkles button-icon\"></i>Analyze and Generate";
@@ -653,6 +685,8 @@ assertionFieldSelect.addEventListener("change", () => {
 assertionRuleSelect.addEventListener("change", renderValueInput);
 addAssertionButton.addEventListener("click", addAssertionDraft);
 analyzeButton.addEventListener("click", analyzeCurlCommand);
+formatResponseButton.addEventListener("click", formatResponseBody);
+toggleResponseWrapButton.addEventListener("click", toggleResponseWrap);
 responseBodyInput.addEventListener("blur", parseResponseBody);
 
 renderAssertionBuilder();
