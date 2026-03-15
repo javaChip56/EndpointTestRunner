@@ -6,6 +6,8 @@ const expandSelectionButton = document.getElementById("expandSelectionButton");
 const collapseSelectionButton = document.getElementById("collapseSelectionButton");
 const expandResultsButton = document.getElementById("expandResultsButton");
 const collapseResultsButton = document.getElementById("collapseResultsButton");
+const selectionSearchInput = document.getElementById("selectionSearchInput");
+const resultsSearchInput = document.getElementById("resultsSearchInput");
 const selectionContainer = document.getElementById("selectionContainer");
 const selectionSummary = document.getElementById("selectionSummary");
 const resultsSummary = document.getElementById("resultsSummary");
@@ -17,6 +19,8 @@ const testTemplate = document.getElementById("testTemplate");
 let suiteManifest = null;
 let selectedTestIds = new Set();
 let lastRunState = null;
+let selectionSearchTerm = "";
+let resultsSearchTerm = "";
 
 const selectionExpansionState = {
     environments: new Map(),
@@ -116,6 +120,7 @@ function hydrateSelection(manifest) {
 
 function renderSelection(manifest) {
     selectionContainer.innerHTML = "";
+    const searchDisplayTerm = selectionSearchInput.value.trim();
 
     if (!manifest || !manifest.environments || manifest.environments.length === 0) {
         selectionSummary.textContent = "No tests were found in the configured YAML files.";
@@ -125,60 +130,74 @@ function renderSelection(manifest) {
     }
 
     const totalTestCount = manifest.totalTests;
-    selectionSummary.textContent = `${selectedTestIds.size} of ${totalTestCount} tests selected`;
+    const filteredEnvironments = filterManifestEnvironments(manifest, selectionSearchTerm);
+    const visibleEndpointCount = filteredEnvironments.reduce((count, environmentEntry) => count + environmentEntry.endpoints.length, 0);
+    const visibleTestCount = filteredEnvironments.reduce(
+        (count, environmentEntry) => count + environmentEntry.endpoints.reduce((endpointCount, endpointEntry) => endpointCount + endpointEntry.tests.length, 0),
+        0
+    );
+
+    selectionSummary.textContent = selectionSearchTerm
+        ? `${selectedTestIds.size} of ${totalTestCount} tests selected | ${visibleEndpointCount} endpoints and ${visibleTestCount} tests shown for "${searchDisplayTerm}"`
+        : `${selectedTestIds.size} of ${totalTestCount} tests selected`;
     updateSelectionButtons(true);
 
-    for (const environment of manifest.environments) {
-        const environmentIds = environment.endpoints.flatMap((endpoint) => endpoint.tests.map((test) => test.id));
+    if (filteredEnvironments.length === 0) {
+        selectionContainer.innerHTML = `<p class="empty-selection">No APIs or endpoints match "${escapeHtml(searchDisplayTerm)}".</p>`;
+        return;
+    }
+
+    for (const environmentEntry of filteredEnvironments) {
+        const { environment, environmentMatches, endpoints } = environmentEntry;
+        const visibleEnvironmentTestIds = endpoints.flatMap((endpointEntry) => endpointEntry.tests.map((test) => test.id));
+
         const environmentNode = document.createElement("details");
         environmentNode.className = "selection-group";
-        environmentNode.open = selectionExpansionState.environments.get(environment.id) ?? true;
+        environmentNode.open = selectionSearchTerm ? true : selectionExpansionState.environments.get(environment.id) ?? true;
         environmentNode.addEventListener("toggle", () => {
             selectionExpansionState.environments.set(environment.id, environmentNode.open);
         });
 
         const environmentSummary = document.createElement("summary");
         environmentSummary.className = "selection-summary-row";
-
-        const environmentHeader = createSelectionHeader(
-            environment.name,
-            `${environment.baseUrl} - ${environment.totalTests} tests`,
-            environmentIds,
+        environmentSummary.appendChild(createSelectionHeader(
+            highlightMatch(environment.name, selectionSearchTerm),
+            environmentMatches || !selectionSearchTerm
+                ? `${highlightMatch(environment.baseUrl, selectionSearchTerm)} - ${environment.totalTests} tests`
+                : `${highlightMatch(environment.baseUrl, selectionSearchTerm)} - ${visibleEnvironmentTestIds.length} matching tests`,
+            visibleEnvironmentTestIds,
             toggleGroupSelection
-        );
-
-        environmentSummary.appendChild(environmentHeader);
-        environmentNode.appendChild(environmentSummary);
+        ));
 
         const environmentBody = document.createElement("div");
         environmentBody.className = "selection-group-body";
 
-        for (const endpoint of environment.endpoints) {
-            const endpointIds = endpoint.tests.map((test) => test.id);
+        for (const endpointEntry of endpoints) {
+            const { endpoint, endpointMatches, tests } = endpointEntry;
+            const endpointIds = tests.map((test) => test.id);
+
             const endpointNode = document.createElement("details");
             endpointNode.className = "selection-subgroup";
-            endpointNode.open = selectionExpansionState.endpoints.get(endpoint.id) ?? false;
+            endpointNode.open = selectionSearchTerm ? true : selectionExpansionState.endpoints.get(endpoint.id) ?? false;
             endpointNode.addEventListener("toggle", () => {
                 selectionExpansionState.endpoints.set(endpoint.id, endpointNode.open);
             });
 
             const endpointSummary = document.createElement("summary");
             endpointSummary.className = "selection-summary-row";
-
-            const endpointHeader = createSelectionHeader(
-                endpoint.name,
-                `${endpoint.method} ${endpoint.path} - ${endpoint.tests.length} tests`,
+            endpointSummary.appendChild(createSelectionHeader(
+                highlightMatch(endpoint.name, selectionSearchTerm),
+                endpointMatches || !selectionSearchTerm
+                    ? `${highlightMatch(endpoint.method, selectionSearchTerm)} ${highlightMatch(endpoint.path, selectionSearchTerm)} - ${tests.length} tests`
+                    : `${highlightMatch(endpoint.method, selectionSearchTerm)} ${highlightMatch(endpoint.path, selectionSearchTerm)} - ${tests.length} matching tests`,
                 endpointIds,
                 toggleGroupSelection
-            );
-
-            endpointSummary.appendChild(endpointHeader);
-            endpointNode.appendChild(endpointSummary);
+            ));
 
             const testList = document.createElement("div");
             testList.className = "selection-test-list";
 
-            for (const test of endpoint.tests) {
+            for (const test of tests) {
                 const testRow = document.createElement("label");
                 testRow.className = "selection-test";
 
@@ -189,29 +208,31 @@ function renderSelection(manifest) {
 
                 const details = document.createElement("span");
                 details.className = "selection-label-stack";
-                details.innerHTML = `<strong>${escapeHtml(test.name)}</strong><span>Expected HTTP ${test.expectedStatus}</span>`;
+                details.innerHTML = `<strong>${highlightMatch(test.name, selectionSearchTerm)}</strong><span>Expected HTTP ${test.expectedStatus}</span>`;
 
                 testRow.appendChild(checkbox);
                 testRow.appendChild(details);
                 testList.appendChild(testRow);
             }
 
+            endpointNode.appendChild(endpointSummary);
             endpointNode.appendChild(testList);
             environmentBody.appendChild(endpointNode);
         }
 
+        environmentNode.appendChild(environmentSummary);
         environmentNode.appendChild(environmentBody);
         selectionContainer.appendChild(environmentNode);
     }
 }
 
-function createSelectionHeader(title, detail, childTestIds, onToggle) {
+function createSelectionHeader(titleHtml, detailHtml, childTestIds, onToggle) {
     const header = document.createElement("div");
     header.className = "selection-header-row";
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
-    checkbox.checked = childTestIds.every((testId) => selectedTestIds.has(testId));
+    checkbox.checked = childTestIds.length > 0 && childTestIds.every((testId) => selectedTestIds.has(testId));
     checkbox.indeterminate = !checkbox.checked && childTestIds.some((testId) => selectedTestIds.has(testId));
     checkbox.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -220,7 +241,7 @@ function createSelectionHeader(title, detail, childTestIds, onToggle) {
 
     const labelStack = document.createElement("span");
     labelStack.className = "selection-label-stack";
-    labelStack.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(detail)}</span>`;
+    labelStack.innerHTML = `<strong>${titleHtml}</strong><span>${detailHtml}</span>`;
 
     header.appendChild(checkbox);
     header.appendChild(labelStack);
@@ -255,9 +276,67 @@ function getAllTestIds(manifest) {
     );
 }
 
+function filterManifestEnvironments(manifest, searchTerm) {
+    if (!searchTerm) {
+        return manifest.environments.map((environment) => ({
+            environment,
+            environmentMatches: false,
+            endpoints: environment.endpoints.map((endpoint) => ({
+                endpoint,
+                endpointMatches: false,
+                tests: endpoint.tests
+            }))
+        }));
+    }
+
+    return manifest.environments
+        .map((environment) => {
+            const environmentMatches =
+                matchesSearch(environment.name, searchTerm) ||
+                matchesSearch(environment.baseUrl, searchTerm);
+
+            const endpoints = environment.endpoints
+                .map((endpoint) => {
+                    const endpointMatches = environmentMatches || endpointMatchesSelectionSearch(endpoint, searchTerm);
+                    return {
+                        endpoint,
+                        endpointMatches,
+                        tests: endpointMatches
+                            ? endpoint.tests
+                            : endpoint.tests.filter((test) => testMatchesSelectionSearch(test, searchTerm))
+                    };
+                })
+                .filter((endpointEntry) => endpointEntry.endpointMatches || endpointEntry.tests.length > 0);
+
+            if (!environmentMatches && endpoints.length === 0) {
+                return null;
+            }
+
+            return {
+                environment,
+                environmentMatches,
+                endpoints
+            };
+        })
+        .filter((entry) => entry !== null);
+}
+
+function endpointMatchesSelectionSearch(endpoint, searchTerm) {
+    return (
+        matchesSearch(endpoint.name, searchTerm) ||
+        matchesSearch(endpoint.method, searchTerm) ||
+        matchesSearch(endpoint.path, searchTerm)
+    );
+}
+
+function testMatchesSelectionSearch(test, searchTerm) {
+    return matchesSearch(test.name, searchTerm);
+}
+
 function renderState(state) {
     lastRunState = state;
     const run = state.lastRun;
+    const searchDisplayTerm = resultsSearchInput.value.trim();
     setStatusError(Boolean(state.lastError));
 
     document.getElementById("runStatus").textContent = buildStatusText(state);
@@ -282,59 +361,83 @@ function renderState(state) {
         return;
     }
 
-    resultsSummary.textContent = `${run.passedTests} passed, ${run.failedTests} failed across ${run.environments.length} environments.`;
+    const filteredEnvironments = filterRunEnvironments(run, resultsSearchTerm);
+    const visibleEndpointCount = filteredEnvironments.reduce((count, environmentEntry) => count + environmentEntry.endpoints.length, 0);
+    const visibleTestCount = filteredEnvironments.reduce(
+        (count, environmentEntry) => count + environmentEntry.endpoints.reduce((endpointCount, endpointEntry) => endpointCount + endpointEntry.tests.length, 0),
+        0
+    );
+
+    resultsSummary.textContent = resultsSearchTerm
+        ? `${run.passedTests} passed, ${run.failedTests} failed overall | ${visibleEndpointCount} endpoints and ${visibleTestCount} tests shown for "${searchDisplayTerm}"`
+        : `${run.passedTests} passed, ${run.failedTests} failed across ${run.environments.length} environments.`;
     updateResultButtons(true);
     synchronizeResultExpansionState(run);
 
-    for (const environment of run.environments) {
+    if (filteredEnvironments.length === 0) {
+        environmentContainer.innerHTML = `<section class="empty-state"><h3>No matching results</h3><p>No APIs, endpoints, tests, assertions, or errors match "${escapeHtml(searchDisplayTerm)}".</p></section>`;
+        return;
+    }
+
+    for (const environmentEntry of filteredEnvironments) {
+        const { environment, environmentMatches, endpoints } = environmentEntry;
         const environmentKey = getResultEnvironmentKey(environment);
+        const visibleTests = endpoints.flatMap((endpointEntry) => endpointEntry.tests);
+        const visiblePassedTests = visibleTests.filter((test) => test.isSuccess).length;
+        const visibleFailedTests = visibleTests.length - visiblePassedTests;
+
         const environmentNode = environmentTemplate.content.firstElementChild.cloneNode(true);
-        environmentNode.open = resultExpansionState.environments.get(environmentKey) ?? environment.failedTests > 0;
+        environmentNode.open = resultsSearchTerm ? true : resultExpansionState.environments.get(environmentKey) ?? environment.failedTests > 0;
         environmentNode.addEventListener("toggle", () => {
             resultExpansionState.environments.set(environmentKey, environmentNode.open);
         });
 
-        environmentNode.querySelector(".environment-name").textContent = environment.name;
-        environmentNode.querySelector(".environment-url").textContent = environment.baseUrl;
-        environmentNode.querySelector(".environment-stats").textContent =
-            `${environment.passedTests} passed, ${environment.failedTests} failed, ${environment.totalTests} total`;
+        environmentNode.querySelector(".environment-name").innerHTML = highlightMatch(environment.name, resultsSearchTerm);
+        environmentNode.querySelector(".environment-url").innerHTML = highlightMatch(environment.baseUrl, resultsSearchTerm);
+        environmentNode.querySelector(".environment-stats").textContent = resultsSearchTerm && !environmentMatches
+            ? `${visiblePassedTests} passed, ${visibleFailedTests} failed, ${visibleTests.length} matching tests`
+            : `${environment.passedTests} passed, ${environment.failedTests} failed, ${environment.totalTests} total`;
 
         const environmentBadge = environmentNode.querySelector(".environment-badge");
-        environmentBadge.textContent = environment.failedTests === 0 ? "Passing" : "Issues";
-        environmentBadge.className = `environment-badge ${environment.failedTests === 0 ? "passing" : "failing"}`;
+        const environmentIsPassing = resultsSearchTerm ? visibleFailedTests === 0 : environment.failedTests === 0;
+        environmentBadge.textContent = environmentIsPassing ? "Passing" : "Issues";
+        environmentBadge.className = `environment-badge ${environmentIsPassing ? "passing" : "failing"}`;
 
         const endpointList = environmentNode.querySelector(".endpoint-list");
 
-        for (const endpoint of environment.endpoints) {
+        for (const endpointEntry of endpoints) {
+            const { endpoint, endpointMatches, tests } = endpointEntry;
             const endpointKey = getResultEndpointKey(environment, endpoint);
             const endpointNode = endpointTemplate.content.firstElementChild.cloneNode(true);
-            endpointNode.open = resultExpansionState.endpoints.get(endpointKey) ?? !endpoint.isSuccess;
+            endpointNode.open = resultsSearchTerm ? true : resultExpansionState.endpoints.get(endpointKey) ?? !endpoint.isSuccess;
             endpointNode.addEventListener("toggle", () => {
                 resultExpansionState.endpoints.set(endpointKey, endpointNode.open);
             });
 
-            endpointNode.querySelector(".endpoint-name").textContent = endpoint.name;
-            endpointNode.querySelector(".endpoint-meta").textContent =
-                `${endpoint.method} ${endpoint.requestUrl} - ${Math.round(endpoint.durationMs)} ms`;
+            endpointNode.querySelector(".endpoint-name").innerHTML = highlightMatch(endpoint.name, resultsSearchTerm);
+            endpointNode.querySelector(".endpoint-meta").innerHTML =
+                `${highlightMatch(endpoint.method, resultsSearchTerm)} ${highlightMatch(endpoint.requestUrl, resultsSearchTerm)} - ${Math.round(endpoint.durationMs)} ms`;
 
             const endpointBadge = endpointNode.querySelector(".endpoint-badge");
-            endpointBadge.textContent = endpoint.isSuccess ? "Pass" : "Fail";
-            endpointBadge.className = `endpoint-badge ${endpoint.isSuccess ? "passing" : "failing"}`;
+            const endpointVisibleFailedTests = tests.filter((test) => !test.isSuccess).length;
+            const endpointIsPassing = resultsSearchTerm ? endpointVisibleFailedTests === 0 : endpoint.isSuccess;
+            endpointBadge.textContent = endpointIsPassing ? "Pass" : "Fail";
+            endpointBadge.className = `endpoint-badge ${endpointIsPassing ? "passing" : "failing"}`;
 
             endpointNode.querySelector(".response-body").textContent =
                 endpoint.responseBody || endpoint.errorMessage || "(empty response)";
 
             const testList = endpointNode.querySelector(".test-list");
 
-            endpoint.tests.forEach((test, testIndex) => {
+            tests.forEach((test, testIndex) => {
                 const testKey = getResultTestKey(environment, endpoint, test, testIndex);
                 const testNode = testTemplate.content.firstElementChild.cloneNode(true);
-                testNode.open = resultExpansionState.tests.get(testKey) ?? !test.isSuccess;
+                testNode.open = resultsSearchTerm ? true : resultExpansionState.tests.get(testKey) ?? !test.isSuccess;
                 testNode.addEventListener("toggle", () => {
                     resultExpansionState.tests.set(testKey, testNode.open);
                 });
 
-                testNode.querySelector(".test-name").textContent = test.name;
+                testNode.querySelector(".test-name").innerHTML = highlightMatch(test.name, resultsSearchTerm);
 
                 const testBadge = testNode.querySelector(".test-badge");
                 testBadge.textContent = test.isSuccess ? "Pass" : "Fail";
@@ -342,7 +445,7 @@ function renderState(state) {
 
                 const expectedText = `Expected ${test.expectedStatus}, actual ${test.actualStatus ?? "n/a"}`;
                 const errorSuffix = test.errorMessage ? ` - ${test.errorMessage}` : "";
-                testNode.querySelector(".test-status-line").textContent = `${expectedText}${errorSuffix}`;
+                testNode.querySelector(".test-status-line").innerHTML = highlightMatch(`${expectedText}${errorSuffix}`, resultsSearchTerm);
 
                 const assertionList = testNode.querySelector(".assertion-list");
                 if (test.assertions.length === 0) {
@@ -351,7 +454,7 @@ function renderState(state) {
                     for (const assertion of test.assertions) {
                         const listItem = document.createElement("li");
                         listItem.className = assertion.isSuccess ? "assertion-pass" : "assertion-fail";
-                        listItem.textContent = `${assertion.rule} on ${assertion.field}: ${assertion.message}`;
+                        listItem.innerHTML = `${highlightMatch(assertion.rule, resultsSearchTerm)} on ${highlightMatch(assertion.field, resultsSearchTerm)}: ${highlightMatch(assertion.message, resultsSearchTerm)}`;
                         assertionList.appendChild(listItem);
                     }
                 }
@@ -364,6 +467,76 @@ function renderState(state) {
 
         environmentContainer.appendChild(environmentNode);
     }
+}
+
+function filterRunEnvironments(run, searchTerm) {
+    if (!searchTerm) {
+        return run.environments.map((environment) => ({
+            environment,
+            environmentMatches: false,
+            endpoints: environment.endpoints.map((endpoint) => ({
+                endpoint,
+                endpointMatches: false,
+                tests: endpoint.tests
+            }))
+        }));
+    }
+
+    return run.environments
+        .map((environment) => {
+            const environmentMatches =
+                matchesSearch(environment.name, searchTerm) ||
+                matchesSearch(environment.baseUrl, searchTerm);
+
+            const endpoints = environment.endpoints
+                .map((endpoint) => {
+                    const endpointMatches = environmentMatches || endpointMatchesRunSearch(endpoint, searchTerm);
+                    return {
+                        endpoint,
+                        endpointMatches,
+                        tests: endpointMatches
+                            ? endpoint.tests
+                            : endpoint.tests.filter((test) => testMatchesRunSearch(test, searchTerm))
+                    };
+                })
+                .filter((endpointEntry) => endpointEntry.endpointMatches || endpointEntry.tests.length > 0);
+
+            if (!environmentMatches && endpoints.length === 0) {
+                return null;
+            }
+
+            return {
+                environment,
+                environmentMatches,
+                endpoints
+            };
+        })
+        .filter((entry) => entry !== null);
+}
+
+function endpointMatchesRunSearch(endpoint, searchTerm) {
+    return (
+        matchesSearch(endpoint.name, searchTerm) ||
+        matchesSearch(endpoint.method, searchTerm) ||
+        matchesSearch(endpoint.requestUrl, searchTerm) ||
+        matchesSearch(endpoint.errorMessage, searchTerm)
+    );
+}
+
+function testMatchesRunSearch(test, searchTerm) {
+    return (
+        matchesSearch(test.name, searchTerm) ||
+        matchesSearch(test.errorMessage, searchTerm) ||
+        test.assertions.some((assertion) => assertionMatchesSearch(assertion, searchTerm))
+    );
+}
+
+function assertionMatchesSearch(assertion, searchTerm) {
+    return (
+        matchesSearch(assertion.field, searchTerm) ||
+        matchesSearch(assertion.rule, searchTerm) ||
+        matchesSearch(assertion.message, searchTerm)
+    );
 }
 
 function synchronizeResultExpansionState(run) {
@@ -534,8 +707,26 @@ function setResultExpansion(isOpen) {
     renderState(lastRunState);
 }
 
+function matchesSearch(value, searchTerm) {
+    return typeof value === "string" && value.toLowerCase().includes(searchTerm);
+}
+
+function highlightMatch(value, searchTerm) {
+    const safeValue = escapeHtml(value);
+    if (!searchTerm || typeof value !== "string") {
+        return safeValue;
+    }
+
+    const pattern = new RegExp(`(${escapeRegExp(searchTerm)})`, "ig");
+    return safeValue.replace(pattern, "<mark class=\"search-highlight\">$1</mark>");
+}
+
+function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function escapeHtml(value) {
-    return value
+    return String(value ?? "")
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;");
@@ -568,5 +759,19 @@ expandSelectionButton.addEventListener("click", () => setSelectionExpansion(true
 collapseSelectionButton.addEventListener("click", () => setSelectionExpansion(false));
 expandResultsButton.addEventListener("click", () => setResultExpansion(true));
 collapseResultsButton.addEventListener("click", () => setResultExpansion(false));
+selectionSearchInput.addEventListener("input", () => {
+    selectionSearchTerm = selectionSearchInput.value.trim().toLowerCase();
+
+    if (suiteManifest) {
+        renderSelection(suiteManifest);
+    }
+});
+resultsSearchInput.addEventListener("input", () => {
+    resultsSearchTerm = resultsSearchInput.value.trim().toLowerCase();
+
+    if (lastRunState) {
+        renderState(lastRunState);
+    }
+});
 
 initializeDashboard();
