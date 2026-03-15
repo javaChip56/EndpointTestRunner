@@ -52,6 +52,12 @@ public sealed class YamlTestSuiteLoader : IYamlTestSuiteLoader
             var yaml = await File.ReadAllTextAsync(filePath, cancellationToken);
             var document = _deserializer.Deserialize<ApiTestDocumentDefinition>(yaml) ?? new ApiTestDocumentDefinition();
 
+            if (ShouldSkipEmptyDocument(yaml, document))
+            {
+                _logger.LogWarning("Skipping empty YAML test file: {FilePath}", filePath);
+                continue;
+            }
+
             ValidateDocumentShape(document, filePath);
 
             foreach (var environment in document.Environments)
@@ -96,6 +102,25 @@ public sealed class YamlTestSuiteLoader : IYamlTestSuiteLoader
             throw new InvalidOperationException(
                 $"YAML file '{filePath}' did not define any environments or endpoints.");
         }
+    }
+
+    private static bool ShouldSkipEmptyDocument(string yaml, ApiTestDocumentDefinition document)
+    {
+        if (document.Environments.Count > 0 || document.Endpoints.Count > 0)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(yaml))
+        {
+            return true;
+        }
+
+        var lines = yaml
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim());
+
+        return lines.All(line => line.Length == 0 || line == "---" || line == "..." || line.StartsWith('#'));
     }
 
     private static void ValidateEnvironment(EnvironmentDefinition environment, string filePath)
