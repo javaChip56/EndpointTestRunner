@@ -484,6 +484,11 @@ body.app-shell {
     padding: 0 0.9rem 0.9rem;
 }
 
+.selection-group-body {
+    background: linear-gradient(180deg, rgba(226, 232, 240, 0.72), rgba(241, 245, 249, 0.88));
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
 .selection-test-list,
 .endpoint-list,
 .test-list {
@@ -501,8 +506,9 @@ body.app-shell {
 .selection-test {
     padding: 0.75rem 0.85rem;
     border-radius: 0.9rem;
-    background: rgba(255, 255, 255, 0.76);
-    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.99);
+    border: 1px solid rgba(15, 23, 42, 0.16);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
 }
 
 .selection-test input,
@@ -551,6 +557,15 @@ body.app-shell {
     position: relative;
     padding: 0.82rem 2.9rem 0.82rem 0.92rem;
     background: rgba(255, 255, 255, 0.55);
+}
+
+.selection-summary-row {
+    background: linear-gradient(180deg, rgba(226, 232, 240, 0.98), rgba(203, 213, 225, 0.92));
+    border-bottom: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.selection-subgroup > .selection-summary-row {
+    background: linear-gradient(180deg, rgba(241, 245, 249, 0.98), rgba(226, 232, 240, 0.94));
 }
 
 .environment-card[open] > .environment-summary-row,
@@ -634,17 +649,34 @@ body.app-shell {
     background: rgba(248, 250, 252, 0.88);
 }
 
+.response-panel-body {
+    padding: 0.85rem 0.95rem 0.95rem;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
 .response-body,
 .code-block {
     margin: 0;
-    padding: 0.85rem 0.95rem;
     overflow: auto;
-    border-top: 1px solid rgba(15, 23, 42, 0.08);
     background: #0f172a;
     color: #e2e8f0;
-    border-radius: 0 0 0.9rem 0.9rem;
     font-size: 0.81rem;
     line-height: 1.45;
+}
+
+.response-body {
+    min-height: 16rem;
+    width: 100%;
+    padding: 0.85rem 0.95rem;
+    border: 0;
+    border-radius: 0.9rem;
+    resize: vertical;
+    font-family: Consolas, "SFMono-Regular", Menlo, monospace;
+}
+
+.code-block {
+    padding: 0.85rem 0.95rem;
+    border-radius: 0 0 0.9rem 0.9rem;
 }
 
 .assertion-list {
@@ -688,6 +720,25 @@ body.app-shell {
     resize: vertical;
     font-family: Consolas, "SFMono-Regular", Menlo, monospace;
     line-height: 1.5;
+}
+
+.response-preview-actions {
+    margin-bottom: 0.8rem;
+}
+
+.response-preview-input {
+    min-height: 20rem;
+    font-size: 0.9rem;
+}
+
+.response-preview-input.is-wrapped {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.response-preview-input.is-unwrapped {
+    white-space: pre;
+    overflow-x: auto;
 }
 
 .tool-input-inline,

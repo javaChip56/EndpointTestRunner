@@ -242,7 +242,13 @@
                 <div class="test-list"></div>
                 <details class="response-panel">
                     <summary>Response preview</summary>
-                    <pre class="response-body"></pre>
+                    <div class="response-panel-body">
+                        <div class="tool-actions response-preview-actions">
+                            <button class="ghost-button inline-button format-response-button" type="button"><i class="fa-solid fa-code button-icon"></i>Format JSON</button>
+                            <button class="ghost-button inline-button toggle-response-wrap-button" type="button"><i class="fa-solid fa-text-width button-icon"></i>Disable Wrap</button>
+                        </div>
+                        <textarea class="response-body response-preview-input is-wrapped" readonly wrap="soft"></textarea>
+                    </div>
                 </details>
             </div>
         </details>

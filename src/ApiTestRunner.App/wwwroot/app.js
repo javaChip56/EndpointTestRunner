@@ -424,8 +424,10 @@ function renderState(state) {
             endpointBadge.textContent = endpointIsPassing ? "Pass" : "Fail";
             endpointBadge.className = `endpoint-badge ${endpointIsPassing ? "passing" : "failing"}`;
 
-            endpointNode.querySelector(".response-body").textContent =
-                endpoint.responseBody || endpoint.errorMessage || "(empty response)";
+            initializeResponsePreview(
+                endpointNode,
+                endpoint.responseBody || endpoint.errorMessage || "(empty response)"
+            );
 
             const testList = endpointNode.querySelector(".test-list");
 
@@ -467,6 +469,33 @@ function renderState(state) {
 
         environmentContainer.appendChild(environmentNode);
     }
+}
+
+function initializeResponsePreview(endpointNode, responseText) {
+    const responseBody = endpointNode.querySelector(".response-body");
+    const formatButton = endpointNode.querySelector(".format-response-button");
+    const toggleWrapButton = endpointNode.querySelector(".toggle-response-wrap-button");
+
+    responseBody.value = formatJsonText(responseText);
+    responseBody.dataset.rawValue = responseText;
+    responseBody.wrap = "soft";
+    responseBody.classList.add("is-wrapped");
+    responseBody.classList.remove("is-unwrapped");
+
+    toggleWrapButton.innerHTML = "<i class=\"fa-solid fa-text-width button-icon\"></i>Disable Wrap";
+    toggleWrapButton.addEventListener("click", () => {
+        const isWrapped = responseBody.classList.contains("is-wrapped");
+        responseBody.wrap = isWrapped ? "off" : "soft";
+        responseBody.classList.toggle("is-wrapped", !isWrapped);
+        responseBody.classList.toggle("is-unwrapped", isWrapped);
+        toggleWrapButton.innerHTML = isWrapped
+            ? "<i class=\"fa-solid fa-align-left button-icon\"></i>Enable Wrap"
+            : "<i class=\"fa-solid fa-text-width button-icon\"></i>Disable Wrap";
+    });
+
+    formatButton.addEventListener("click", () => {
+        responseBody.value = formatJsonText(responseBody.dataset.rawValue || responseBody.value);
+    });
 }
 
 function filterRunEnvironments(run, searchTerm) {
@@ -613,6 +642,18 @@ function formatDate(value) {
     }
 
     return new Date(value).toLocaleString();
+}
+
+function formatJsonText(value) {
+    if (typeof value !== "string") {
+        return String(value ?? "");
+    }
+
+    try {
+        return JSON.stringify(JSON.parse(value), null, 2);
+    } catch {
+        return value;
+    }
 }
 
 async function buildErrorMessage(response, fallbackMessage) {
