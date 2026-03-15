@@ -260,6 +260,13 @@ body.app-shell {
     color: #94a3b8;
 }
 
+.search-highlight {
+    padding: 0 0.14rem;
+    border-radius: 0.3rem;
+    background: rgba(255, 193, 7, 0.38);
+    color: inherit;
+}
+
 .primary-button,
 .ghost-button {
     display: inline-flex;

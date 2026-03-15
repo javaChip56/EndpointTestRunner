@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ApiTestRunner.Core.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+77b3fd30756e5d51d100aa09a8ba907ccdb30c1a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b6531e3d6db2e3250c965f806f08cd3f385db4fb")]
 [assembly: System.Reflection.AssemblyProductAttribute("ApiTestRunner.Core.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ApiTestRunner.Core.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
