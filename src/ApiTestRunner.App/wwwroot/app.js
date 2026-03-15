@@ -6,6 +6,7 @@ const expandSelectionButton = document.getElementById("expandSelectionButton");
 const collapseSelectionButton = document.getElementById("collapseSelectionButton");
 const expandResultsButton = document.getElementById("expandResultsButton");
 const collapseResultsButton = document.getElementById("collapseResultsButton");
+const selectionSearchInput = document.getElementById("selectionSearchInput");
 const selectionContainer = document.getElementById("selectionContainer");
 const selectionSummary = document.getElementById("selectionSummary");
 const resultsSummary = document.getElementById("resultsSummary");
@@ -17,6 +18,7 @@ const testTemplate = document.getElementById("testTemplate");
 let suiteManifest = null;
 let selectedTestIds = new Set();
 let lastRunState = null;
+let selectionSearchTerm = "";
 
 const selectionExpansionState = {
     environments: new Map(),
@@ -116,6 +118,7 @@ function hydrateSelection(manifest) {
 
 function renderSelection(manifest) {
     selectionContainer.innerHTML = "";
+    const selectionSearchDisplayTerm = selectionSearchInput.value.trim();
 
     if (!manifest || !manifest.environments || manifest.environments.length === 0) {
         selectionSummary.textContent = "No tests were found in the configured YAML files.";
@@ -125,14 +128,29 @@ function renderSelection(manifest) {
     }
 
     const totalTestCount = manifest.totalTests;
-    selectionSummary.textContent = `${selectedTestIds.size} of ${totalTestCount} tests selected`;
+    const filteredEnvironments = filterManifestEnvironments(manifest, selectionSearchTerm);
+    const visibleEndpointCount = filteredEnvironments.reduce((count, environmentEntry) => count + environmentEntry.endpoints.length, 0);
+    const visibleTestCount = filteredEnvironments.reduce(
+        (count, environmentEntry) => count + environmentEntry.endpoints.reduce((endpointCount, endpointEntry) => endpointCount + endpointEntry.endpoint.tests.length, 0),
+        0
+    );
+
+    selectionSummary.textContent = selectionSearchTerm
+        ? `${selectedTestIds.size} of ${totalTestCount} tests selected • ${visibleEndpointCount} endpoints and ${visibleTestCount} tests shown for "${selectionSearchDisplayTerm}"`
+        : `${selectedTestIds.size} of ${totalTestCount} tests selected`;
     updateSelectionButtons(true);
 
-    for (const environment of manifest.environments) {
-        const environmentIds = environment.endpoints.flatMap((endpoint) => endpoint.tests.map((test) => test.id));
+    if (filteredEnvironments.length === 0) {
+        selectionContainer.innerHTML = `<p class="empty-selection">No APIs or endpoints match "${escapeHtml(selectionSearchDisplayTerm)}".</p>`;
+        return;
+    }
+
+    for (const environmentEntry of filteredEnvironments) {
+        const { environment, endpoints, environmentMatches } = environmentEntry;
+        const environmentIds = endpoints.flatMap((endpointEntry) => endpointEntry.endpoint.tests.map((test) => test.id));
         const environmentNode = document.createElement("details");
         environmentNode.className = "selection-group";
-        environmentNode.open = selectionExpansionState.environments.get(environment.id) ?? true;
+        environmentNode.open = selectionSearchTerm ? true : selectionExpansionState.environments.get(environment.id) ?? true;
         environmentNode.addEventListener("toggle", () => {
             selectionExpansionState.environments.set(environment.id, environmentNode.open);
         });
@@ -142,7 +160,9 @@ function renderSelection(manifest) {
 
         const environmentHeader = createSelectionHeader(
             environment.name,
-            `${environment.baseUrl} - ${environment.totalTests} tests`,
+            environmentMatches || !selectionSearchTerm
+                ? `${environment.baseUrl} - ${environment.totalTests} tests`
+                : `${environment.baseUrl} - ${environmentIds.length} matching tests`,
             environmentIds,
             toggleGroupSelection
         );
@@ -153,11 +173,12 @@ function renderSelection(manifest) {
         const environmentBody = document.createElement("div");
         environmentBody.className = "selection-group-body";
 
-        for (const endpoint of environment.endpoints) {
+        for (const endpointEntry of endpoints) {
+            const { endpoint } = endpointEntry;
             const endpointIds = endpoint.tests.map((test) => test.id);
             const endpointNode = document.createElement("details");
             endpointNode.className = "selection-subgroup";
-            endpointNode.open = selectionExpansionState.endpoints.get(endpoint.id) ?? false;
+            endpointNode.open = selectionSearchTerm ? true : selectionExpansionState.endpoints.get(endpoint.id) ?? false;
             endpointNode.addEventListener("toggle", () => {
                 selectionExpansionState.endpoints.set(endpoint.id, endpointNode.open);
             });
@@ -253,6 +274,62 @@ function getAllTestIds(manifest) {
     return manifest.environments.flatMap((environment) =>
         environment.endpoints.flatMap((endpoint) => endpoint.tests.map((test) => test.id))
     );
+}
+
+function filterManifestEnvironments(manifest, searchTerm) {
+    if (!searchTerm) {
+        return manifest.environments.map((environment) => ({
+            environment,
+            environmentMatches: false,
+            endpoints: environment.endpoints.map((endpoint) => ({
+                endpoint,
+                endpointMatches: false
+            }))
+        }));
+    }
+
+    return manifest.environments
+        .map((environment) => {
+            const environmentMatches =
+                matchesSelectionSearch(environment.name, searchTerm) ||
+                matchesSelectionSearch(environment.baseUrl, searchTerm);
+
+            const visibleEndpoints = environment.endpoints
+                .filter((endpoint) => environmentMatches || endpointMatchesSelectionSearch(endpoint, searchTerm))
+                .map((endpoint) => ({
+                    endpoint,
+                    endpointMatches: environmentMatches || endpointMatchesSelectionSearch(endpoint, searchTerm)
+                }));
+
+            if (!environmentMatches && visibleEndpoints.length === 0) {
+                return null;
+            }
+
+            return {
+                environment,
+                environmentMatches,
+                endpoints: environmentMatches
+                    ? environment.endpoints.map((endpoint) => ({
+                        endpoint,
+                        endpointMatches: true
+                    }))
+                    : visibleEndpoints
+            };
+        })
+        .filter((entry) => entry !== null);
+}
+
+function endpointMatchesSelectionSearch(endpoint, searchTerm) {
+    return (
+        matchesSelectionSearch(endpoint.name, searchTerm) ||
+        matchesSelectionSearch(endpoint.method, searchTerm) ||
+        matchesSelectionSearch(endpoint.path, searchTerm) ||
+        endpoint.tests.some((test) => matchesSelectionSearch(test.name, searchTerm))
+    );
+}
+
+function matchesSelectionSearch(value, searchTerm) {
+    return typeof value === "string" && value.toLowerCase().includes(searchTerm);
 }
 
 function renderState(state) {
@@ -568,5 +645,12 @@ expandSelectionButton.addEventListener("click", () => setSelectionExpansion(true
 collapseSelectionButton.addEventListener("click", () => setSelectionExpansion(false));
 expandResultsButton.addEventListener("click", () => setResultExpansion(true));
 collapseResultsButton.addEventListener("click", () => setResultExpansion(false));
+selectionSearchInput.addEventListener("input", () => {
+    selectionSearchTerm = selectionSearchInput.value.trim().toLowerCase();
+
+    if (suiteManifest) {
+        renderSelection(suiteManifest);
+    }
+});
 
 initializeDashboard();

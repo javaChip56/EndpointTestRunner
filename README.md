@@ -50,6 +50,7 @@ The main dashboard now exposes a test-selection panel before execution:
 - `Select All` enables the full suite.
 - `Clear All` disables every test.
 - `Expand All` and `Collapse All` control the selection tree.
+- Search filters APIs, base URLs, endpoints, methods, and test names in the selection tree.
 - Environment, endpoint, and individual test checkboxes let you run only the subset you care about.
 - Each page load starts with all tests selected by default.
 - The dashboard and cURL import pages use local AdminLTE assets, so the UI does not rely on external CDNs at runtime.
