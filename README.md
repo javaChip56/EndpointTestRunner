@@ -110,6 +110,14 @@ Assumption:
 
 - The CI/CD platform is GitHub Actions. If you need Azure DevOps, GitLab CI, or Jenkins instead, the same stages can be ported.
 
+## Future enhancements
+
+The current version is intentionally focused on a local dashboard-driven workflow. The next major enhancements are:
+
+- CLI and CI execution mode with options such as `--ci`, `--env`, and `--file`, plus machine-readable result output like JSON and JUnit XML for pipeline use
+- Response value capture and run-scoped variable reuse so one request can extract data such as tokens or IDs and pass them into later requests
+- Live execution progress in the dashboard so long-running suites can stream environment, endpoint, and test updates while the run is still in progress
+
 ## Configuration
 
 `src/ApiTestRunner.App/appsettings.json` controls:
