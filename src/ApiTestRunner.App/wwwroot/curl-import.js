@@ -453,8 +453,8 @@ function renderRequestCard(request) {
 }
 
 function renderEnvironmentCard(environment) {
-    const { card, body } = createCard("Environment scan", "Checks all loaded environment YAML definitions for an existing URL match before suggesting a new environment file.");
-    body.appendChild(createBadgeRow(environment.exists, environment.exists ? "Environment found" : "Environment missing"));
+    const { card, body } = createCard("Environment scan", buildEnvironmentSummary(environment));
+    body.appendChild(createMatchBadgeRow(environment.matchStatus, getEnvironmentStatusLabel(environment)));
 
     const details = document.createElement("dl");
     details.className = "detail-list";
@@ -467,20 +467,36 @@ function renderEnvironmentCard(environment) {
 
     body.appendChild(details);
 
+    if (environment.candidates && environment.candidates.length > 0) {
+        body.appendChild(createCandidateList(
+            "Matched candidates",
+            environment.candidates,
+            (candidate) => `${candidate.name} -> ${candidate.baseUrl} (relative path ${candidate.relativePath})`));
+    }
+
     if (environment.suggestedYaml) {
-        body.appendChild(createCopyAction(environment.suggestedYaml, "Copy environment YAML"));
-        const preview = document.createElement("pre");
-        preview.className = "code-block";
-        preview.textContent = environment.suggestedYaml;
-        body.appendChild(preview);
+        if (environment.currentYaml) {
+            body.appendChild(createCodeSection("Current environment YAML", environment.currentYaml));
+        }
+        if (environment.currentYaml && environment.suggestedYaml) {
+            body.appendChild(createInlineDiffSection("Inline diff", environment.currentYaml, environment.suggestedYaml));
+        } else if (environment.diffYaml) {
+            body.appendChild(createCodeSection("Diff preview", environment.diffYaml, "code-block diff-block"));
+        }
+        body.appendChild(createCopyAction(
+            environment.suggestedYaml,
+            environment.matchStatus === "matched" ? "Copy updated environment YAML" : "Copy environment YAML"));
+        body.appendChild(createCodeSection(
+            environment.matchStatus === "matched" ? "Updated environment YAML" : "Suggested environment YAML",
+            environment.suggestedYaml));
     }
 
     return card;
 }
 
 function renderEndpointCard(endpoint) {
-    const { card, body } = createCard("Endpoint scan", "Checks whether the endpoint already exists, then generates endpoint YAML including any assertion rules you added.");
-    body.appendChild(createBadgeRow(endpoint.exists, endpoint.exists ? "Endpoint found" : "Endpoint missing"));
+    const { card, body } = createCard("Endpoint scan", buildEndpointSummary(endpoint));
+    body.appendChild(createMatchBadgeRow(endpoint.matchStatus, getEndpointStatusLabel(endpoint)));
 
     const details = document.createElement("dl");
     details.className = "detail-list";
@@ -493,12 +509,28 @@ function renderEndpointCard(endpoint) {
 
     body.appendChild(details);
 
+    if (endpoint.candidates && endpoint.candidates.length > 0) {
+        body.appendChild(createCandidateList(
+            "Matched candidates",
+            endpoint.candidates,
+            (candidate) => `${candidate.name} -> ${candidate.method} ${candidate.path} (${candidate.environmentNames.join(", ")})`));
+    }
+
     if (endpoint.suggestedYaml) {
-        body.appendChild(createCopyAction(endpoint.suggestedYaml, "Copy endpoint YAML"));
-        const preview = document.createElement("pre");
-        preview.className = "code-block";
-        preview.textContent = endpoint.suggestedYaml;
-        body.appendChild(preview);
+        if (endpoint.currentYaml) {
+            body.appendChild(createCodeSection("Current endpoint YAML", endpoint.currentYaml));
+        }
+        if (endpoint.currentYaml && endpoint.suggestedYaml) {
+            body.appendChild(createInlineDiffSection("Inline diff", endpoint.currentYaml, endpoint.suggestedYaml));
+        } else if (endpoint.diffYaml) {
+            body.appendChild(createCodeSection("Diff preview", endpoint.diffYaml, "code-block diff-block"));
+        }
+        body.appendChild(createCopyAction(
+            endpoint.suggestedYaml,
+            endpoint.matchStatus === "matched" ? "Copy updated endpoint YAML" : "Copy endpoint YAML"));
+        body.appendChild(createCodeSection(
+            endpoint.matchStatus === "matched" ? "Updated endpoint YAML" : "Suggested endpoint YAML",
+            endpoint.suggestedYaml));
     }
 
     return card;
@@ -528,6 +560,23 @@ function createBadgeRow(isPassing, text) {
 
     const badge = document.createElement("span");
     badge.className = `status-badge ${isPassing ? "passing" : "failing"}`;
+    badge.textContent = text;
+
+    wrapper.appendChild(badge);
+    return wrapper;
+}
+
+function createMatchBadgeRow(matchStatus, text) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "badge-row";
+
+    const badge = document.createElement("span");
+    const statusClass = matchStatus === "matched"
+        ? "passing"
+        : matchStatus === "ambiguous"
+            ? "warning"
+            : "failing";
+    badge.className = `status-badge ${statusClass}`;
     badge.textContent = text;
 
     wrapper.appendChild(badge);
@@ -573,6 +622,218 @@ function createCopyAction(text, label) {
 
     actionRow.appendChild(button);
     return actionRow;
+}
+
+function createCodeSection(title, text, codeClassName = "code-block") {
+    const wrapper = document.createElement("section");
+    wrapper.className = "preview-code-section";
+
+    const heading = document.createElement("h3");
+    heading.className = "preview-code-title";
+    heading.textContent = title;
+
+    const preview = document.createElement("pre");
+    preview.className = codeClassName;
+    preview.textContent = text;
+
+    wrapper.appendChild(heading);
+    wrapper.appendChild(preview);
+    return wrapper;
+}
+
+function createInlineDiffSection(title, currentText, updatedText) {
+    const wrapper = document.createElement("section");
+    wrapper.className = "preview-code-section";
+
+    const heading = document.createElement("h3");
+    heading.className = "preview-code-title";
+    heading.textContent = title;
+
+    const preview = document.createElement("pre");
+    preview.className = "code-block inline-diff-block";
+    preview.innerHTML = buildInlineDiffHtml(currentText, updatedText);
+
+    wrapper.appendChild(heading);
+    wrapper.appendChild(preview);
+    return wrapper;
+}
+
+function buildInlineDiffHtml(currentText, updatedText) {
+    const currentLines = normalizeDiffText(currentText).split("\n");
+    const updatedLines = normalizeDiffText(updatedText).split("\n");
+    const rows = buildLineDiffRows(currentLines, updatedLines);
+
+    return rows.map((row) => {
+        if (row.type === "context") {
+            return `<div class="diff-line diff-line-context"><span class="diff-marker"> </span><span class="diff-content">${escapeHtml(row.text)}</span></div>`;
+        }
+
+        if (row.type === "remove") {
+            return `<div class="diff-line diff-line-remove"><span class="diff-marker">-</span><span class="diff-content">${escapeHtml(row.text)}</span></div>`;
+        }
+
+        if (row.type === "add") {
+            return `<div class="diff-line diff-line-add"><span class="diff-marker">+</span><span class="diff-content">${escapeHtml(row.text)}</span></div>`;
+        }
+
+        const removedHtml = renderInlineSegments(row.removedSegments, "remove");
+        const addedHtml = renderInlineSegments(row.addedSegments, "add");
+
+        return [
+            `<div class="diff-line diff-line-remove"><span class="diff-marker">-</span><span class="diff-content">${removedHtml}</span></div>`,
+            `<div class="diff-line diff-line-add"><span class="diff-marker">+</span><span class="diff-content">${addedHtml}</span></div>`
+        ].join("");
+    }).join("");
+}
+
+function buildLineDiffRows(currentLines, updatedLines) {
+    const lcs = buildLcsMatrix(currentLines, updatedLines);
+    const rows = [];
+    let currentIndex = 0;
+    let updatedIndex = 0;
+
+    while (currentIndex < currentLines.length && updatedIndex < updatedLines.length) {
+        if (currentLines[currentIndex] === updatedLines[updatedIndex]) {
+            rows.push({ type: "context", text: currentLines[currentIndex] });
+            currentIndex++;
+            updatedIndex++;
+            continue;
+        }
+
+        const removeScore = lcs[currentIndex + 1][updatedIndex];
+        const addScore = lcs[currentIndex][updatedIndex + 1];
+
+        if (removeScore === addScore && currentIndex + 1 <= currentLines.length && updatedIndex + 1 <= updatedLines.length) {
+            rows.push({
+                type: "modify",
+                removedSegments: buildInlineSegments(currentLines[currentIndex], updatedLines[updatedIndex], "remove"),
+                addedSegments: buildInlineSegments(currentLines[currentIndex], updatedLines[updatedIndex], "add")
+            });
+            currentIndex++;
+            updatedIndex++;
+            continue;
+        }
+
+        if (removeScore >= addScore) {
+            rows.push({ type: "remove", text: currentLines[currentIndex] });
+            currentIndex++;
+        } else {
+            rows.push({ type: "add", text: updatedLines[updatedIndex] });
+            updatedIndex++;
+        }
+    }
+
+    while (currentIndex < currentLines.length) {
+        rows.push({ type: "remove", text: currentLines[currentIndex] });
+        currentIndex++;
+    }
+
+    while (updatedIndex < updatedLines.length) {
+        rows.push({ type: "add", text: updatedLines[updatedIndex] });
+        updatedIndex++;
+    }
+
+    return rows;
+}
+
+function buildInlineSegments(currentLine, updatedLine, mode) {
+    const currentTokens = tokenizeDiffLine(currentLine);
+    const updatedTokens = tokenizeDiffLine(updatedLine);
+    const lcs = buildLcsMatrix(currentTokens, updatedTokens);
+    const segments = [];
+    let currentIndex = 0;
+    let updatedIndex = 0;
+
+    while (currentIndex < currentTokens.length && updatedIndex < updatedTokens.length) {
+        if (currentTokens[currentIndex] === updatedTokens[updatedIndex]) {
+            segments.push({ text: mode === "remove" ? currentTokens[currentIndex] : updatedTokens[updatedIndex], changed: false });
+            currentIndex++;
+            updatedIndex++;
+            continue;
+        }
+
+        if (lcs[currentIndex + 1][updatedIndex] >= lcs[currentIndex][updatedIndex + 1]) {
+            if (mode === "remove") {
+                segments.push({ text: currentTokens[currentIndex], changed: true });
+            }
+            currentIndex++;
+        } else {
+            if (mode === "add") {
+                segments.push({ text: updatedTokens[updatedIndex], changed: true });
+            }
+            updatedIndex++;
+        }
+    }
+
+    while (currentIndex < currentTokens.length) {
+        if (mode === "remove") {
+            segments.push({ text: currentTokens[currentIndex], changed: true });
+        }
+        currentIndex++;
+    }
+
+    while (updatedIndex < updatedTokens.length) {
+        if (mode === "add") {
+            segments.push({ text: updatedTokens[updatedIndex], changed: true });
+        }
+        updatedIndex++;
+    }
+
+    return segments;
+}
+
+function renderInlineSegments(segments, mode) {
+    return segments.map((segment) => {
+        const safeText = escapeHtml(segment.text);
+        return segment.changed
+            ? `<span class="diff-change diff-change-${mode}">${safeText}</span>`
+            : safeText;
+    }).join("");
+}
+
+function tokenizeDiffLine(line) {
+    return line.match(/(\s+|[^\s]+)/g) ?? [line];
+}
+
+function buildLcsMatrix(left, right) {
+    const matrix = Array.from({ length: left.length + 1 }, () => Array(right.length + 1).fill(0));
+
+    for (let leftIndex = left.length - 1; leftIndex >= 0; leftIndex -= 1) {
+        for (let rightIndex = right.length - 1; rightIndex >= 0; rightIndex -= 1) {
+            matrix[leftIndex][rightIndex] = left[leftIndex] === right[rightIndex]
+                ? matrix[leftIndex + 1][rightIndex + 1] + 1
+                : Math.max(matrix[leftIndex + 1][rightIndex], matrix[leftIndex][rightIndex + 1]);
+        }
+    }
+
+    return matrix;
+}
+
+function normalizeDiffText(value) {
+    return String(value ?? "").replaceAll("\r\n", "\n");
+}
+
+function createCandidateList(title, candidates, formatCandidate) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "detail-list";
+
+    const term = document.createElement("dt");
+    term.textContent = title;
+
+    const description = document.createElement("dd");
+    const list = document.createElement("ul");
+    list.className = "candidate-list";
+
+    candidates.forEach((candidate) => {
+        const item = document.createElement("li");
+        item.textContent = formatCandidate(candidate);
+        list.appendChild(item);
+    });
+
+    description.appendChild(list);
+    wrapper.appendChild(term);
+    wrapper.appendChild(description);
+    return wrapper;
 }
 
 function formatSample(value) {
@@ -637,6 +898,54 @@ function renderVariablesCard(variables) {
     }
 
     return card;
+}
+
+function buildEnvironmentSummary(environment) {
+    if (environment.matchStatus === "matched") {
+        return "Matched an existing environment by URL. Review the updated YAML block below and merge the changes manually into the right file.";
+    }
+
+    if (environment.matchStatus === "ambiguous") {
+        return "Multiple existing environments matched this request URL. Review the candidates below and decide which YAML file to update manually.";
+    }
+
+    return "No existing environment matched this request URL. A new environment YAML block is suggested below.";
+}
+
+function buildEndpointSummary(endpoint) {
+    if (endpoint.matchStatus === "matched") {
+        return "Matched an existing endpoint by method and path. Review the updated YAML block below and merge the changes manually into the right file.";
+    }
+
+    if (endpoint.matchStatus === "ambiguous") {
+        return "Multiple existing endpoints matched this request. Review the candidates below and decide which YAML file to update manually.";
+    }
+
+    return "No existing endpoint matched this request. A new endpoint YAML block is suggested below.";
+}
+
+function getEnvironmentStatusLabel(environment) {
+    if (environment.matchStatus === "matched") {
+        return "Matched existing environment";
+    }
+
+    if (environment.matchStatus === "ambiguous") {
+        return "Multiple environment matches";
+    }
+
+    return "Environment missing";
+}
+
+function getEndpointStatusLabel(endpoint) {
+    if (endpoint.matchStatus === "matched") {
+        return "Matched existing endpoint";
+    }
+
+    if (endpoint.matchStatus === "ambiguous") {
+        return "Multiple endpoint matches";
+    }
+
+    return "Endpoint missing";
 }
 
 function renderResponseStatus(message, isError) {
