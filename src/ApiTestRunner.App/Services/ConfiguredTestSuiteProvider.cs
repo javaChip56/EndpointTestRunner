@@ -12,21 +12,27 @@ public sealed class ConfiguredTestSuiteProvider : IConfiguredTestSuiteProvider
 
     private readonly IYamlTestSuiteLoader _loader;
     private readonly IOptions<ExecutionOptions> _executionOptions;
+    private readonly IOptions<CliExecutionOptions> _cliExecutionOptions;
     private readonly IHostEnvironment _hostEnvironment;
 
     public ConfiguredTestSuiteProvider(
         IYamlTestSuiteLoader loader,
         IOptions<ExecutionOptions> executionOptions,
+        IOptions<CliExecutionOptions> cliExecutionOptions,
         IHostEnvironment hostEnvironment)
     {
         _loader = loader;
         _executionOptions = executionOptions;
+        _cliExecutionOptions = cliExecutionOptions;
         _hostEnvironment = hostEnvironment;
     }
 
     public async Task<LoadedTestSuite> LoadAsync(CancellationToken cancellationToken = default)
     {
-        var filePaths = ResolveConfiguredFiles(_executionOptions.Value.TestFiles);
+        var configuredFiles = _cliExecutionOptions.Value.Enabled && _cliExecutionOptions.Value.TestFiles.Count > 0
+            ? _cliExecutionOptions.Value.TestFiles
+            : _executionOptions.Value.TestFiles;
+        var filePaths = ResolveConfiguredFiles(configuredFiles);
         var suite = await _loader.LoadAsync(filePaths, cancellationToken);
         return new LoadedTestSuite(suite, filePaths);
     }

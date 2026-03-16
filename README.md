@@ -20,6 +20,7 @@
 - Path params, query params, headers, and JSON request bodies
 - Dot-notation assertions with array index support
 - Validation for strings, objects, and arrays
+- CLI and CI execution mode with environment and file filtering, JSON output, JUnit XML output, and non-zero exit codes on failed runs
 - Toggleable test selection in the dashboard, including select-all, clear-all, expand-all, collapse-all, and individual test control
 - Collapsible pass/fail reporting with environment, endpoint, test, and response-preview drill-down
 - cURL analysis page that scans configured YAML definitions, generates suggested environment and endpoint YAML when missing, and supports response-driven assertion building
@@ -42,6 +43,41 @@ dotnet run --project src/ApiTestRunner.App -c Release
 ```
 
 The app starts the dashboard at `http://localhost:5005` by default, auto-launches the browser if enabled, and executes the split sample suite after the web server is ready.
+
+## CLI and CI mode
+
+The same executable also supports headless execution for terminal and pipeline use.
+
+Basic examples:
+
+```powershell
+dotnet run --project src/ApiTestRunner.App -- --ci
+dotnet run --project src/ApiTestRunner.App -- --ci --env Local
+dotnet run --project src/ApiTestRunner.App -- --ci --env Local,UAT
+dotnet run --project src/ApiTestRunner.App -- --ci --file Samples/Environments/sample-api.yaml --file Samples/Endpoints/accounts/get-accounts.yaml
+dotnet run --project src/ApiTestRunner.App -- --ci --format json
+dotnet run --project src/ApiTestRunner.App -- --ci --format junit --output artifacts/test-results.xml
+```
+
+Supported CLI options:
+
+- `--ci` enables headless execution mode
+- `--env <name[,name2]>` runs only the named environments and can be repeated
+- `--file <path|glob|directory>` overrides `Execution.TestFiles` for this run and can be repeated
+- `--format <none|json|junit>` emits machine-readable results
+- `--output <path>` writes formatted output to a file instead of standard output
+
+CLI behavior:
+
+- exit code `0` means all selected tests passed
+- exit code `1` means at least one test failed or the run could not be completed
+- relative `--file` and `--output` paths are resolved from the app content root
+- `--file` accepts the same exact paths, directories, and glob patterns as `Execution.TestFiles`
+- when `--format` is omitted, the CLI still prints the human-readable execution summary
+
+Practical note:
+
+- CLI mode still boots the ASP.NET Core host internally before running the suite. That is intentional because the bundled sample suite targets the embedded `/sample-api/*` endpoints.
 
 ## Dashboard workflow
 
@@ -110,11 +146,18 @@ Assumption:
 
 - The CI/CD platform is GitHub Actions. If you need Azure DevOps, GitLab CI, or Jenkins instead, the same stages can be ported.
 
+Pipeline example:
+
+```powershell
+dotnet run --project src/ApiTestRunner.App -- --ci --env Local --format junit --output artifacts/test-results.xml
+```
+
+This is a good default shape for CI jobs because it produces a predictable exit code and a result artifact that most pipeline systems can ingest.
+
 ## Future enhancements
 
 The current version is intentionally focused on a local dashboard-driven workflow. The next major enhancements are:
 
-- CLI and CI execution mode with options such as `--ci`, `--env`, and `--file`, plus machine-readable result output like JSON and JUnit XML for pipeline use
 - Response value capture and run-scoped variable reuse so one request can extract data such as tokens or IDs and pass them into later requests
 - Live execution progress in the dashboard so long-running suites can stream environment, endpoint, and test updates while the run is still in progress
 
@@ -128,6 +171,12 @@ The current version is intentionally focused on a local dashboard-driven workflo
 - `Execution.TestFiles`
 - `Execution.MaxConcurrency`
 - `Execution.HttpTimeoutSeconds`
+
+CLI mode can override part of this configuration per run:
+
+- `--file` overrides `Execution.TestFiles`
+- `--env` narrows execution to specific loaded environments
+- `--format` and `--output` affect only CLI result export and do not change dashboard behavior
 
 `Execution.TestFiles` accepts:
 

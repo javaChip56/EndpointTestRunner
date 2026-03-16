@@ -6,6 +6,7 @@ using ApiTestRunner.Core.Extensions;
 using ApiTestRunner.Core.Services;
 using Microsoft.Extensions.Options;
 
+var cliExecutionOptions = CliArgumentParser.Parse(args);
 var builder = WebApplication.CreateBuilder(args);
 
 var webServerOptions = builder.Configuration
@@ -16,12 +17,21 @@ builder.WebHost.UseUrls($"http://{webServerOptions.Host}:{webServerOptions.Port}
 
 builder.Services.Configure<WebServerOptions>(builder.Configuration.GetSection(WebServerOptions.SectionName));
 builder.Services.Configure<ExecutionOptions>(builder.Configuration.GetSection(ExecutionOptions.SectionName));
+builder.Services.AddSingleton(Options.Create(cliExecutionOptions));
 
 builder.Services.AddApiTestRunnerCore();
 builder.Services.AddSingleton<IConfiguredTestSuiteProvider, ConfiguredTestSuiteProvider>();
 builder.Services.AddSingleton<ICurlCommandAnalyzer, CurlCommandAnalyzer>();
 builder.Services.AddSingleton<TestRunCoordinator>();
-builder.Services.AddHostedService<StartupAutomationHostedService>();
+builder.Services.AddSingleton<CliResultWriter>();
+if (cliExecutionOptions.Enabled)
+{
+    builder.Services.AddHostedService<CliExecutionHostedService>();
+}
+else
+{
+    builder.Services.AddHostedService<StartupAutomationHostedService>();
+}
 
 builder.Services.AddHttpClient<IApiTestExecutor, ApiTestExecutor>((serviceProvider, client) =>
 {
