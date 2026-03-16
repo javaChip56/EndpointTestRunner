@@ -332,6 +332,25 @@ body.app-shell {
     transform: translateY(-1px);
 }
 
+.ghost-button.is-active {
+    background: var(--results-panel-accent);
+    border-color: rgba(29, 78, 216, 0.22);
+    color: #fff;
+    box-shadow: 0 10px 22px rgba(29, 78, 216, 0.18);
+}
+
+#showPassingResultsButton.is-active {
+    background: linear-gradient(135deg, #16a34a, #166534);
+    border-color: rgba(22, 163, 74, 0.24);
+    box-shadow: 0 10px 22px rgba(22, 163, 74, 0.18);
+}
+
+#showFailingResultsButton.is-active {
+    background: linear-gradient(135deg, #dc2626, #991b1b);
+    border-color: rgba(220, 38, 38, 0.24);
+    box-shadow: 0 10px 22px rgba(220, 38, 38, 0.18);
+}
+
 .primary-button:disabled,
 .ghost-button:disabled {
     opacity: 0.65;
@@ -614,6 +633,20 @@ body.app-shell {
 .test-status-line,
 .detail-list dd {
     color: #667085;
+}
+
+.environment-stats .stats-pass {
+    color: var(--app-pass);
+    font-weight: 700;
+}
+
+.environment-stats .stats-fail {
+    color: var(--app-fail);
+    font-weight: 700;
+}
+
+.environment-stats .stats-total {
+    color: inherit;
 }
 
 .selection-label-stack span {
