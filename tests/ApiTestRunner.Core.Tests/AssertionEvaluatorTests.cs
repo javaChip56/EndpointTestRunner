@@ -127,4 +127,53 @@ public sealed class AssertionEvaluatorTests
         Assert.NotEmpty(results);
         Assert.All(results, result => Assert.True(result.IsSuccess, result.Message));
     }
+
+    [Fact]
+    public void EvaluateAll_SupportsNumericComparisonAssertions()
+    {
+        var response = JsonNode.Parse("""
+            {
+              "statusCode": 1,
+              "data": {
+                "totalRowsCount": 149,
+                "profitPercentage": -74.03
+              }
+            }
+            """);
+
+        var assertions = new[]
+        {
+            new AssertionDefinition { Field = "data.totalRowsCount", GreaterThan = 0 },
+            new AssertionDefinition { Field = "data.totalRowsCount", GreaterThanOrEqual = 149 },
+            new AssertionDefinition { Field = "data.totalRowsCount", LessThan = 200 },
+            new AssertionDefinition { Field = "data.profitPercentage", LessThanOrEqual = -74.03m }
+        };
+
+        var results = _evaluator.EvaluateAll(assertions, response);
+
+        Assert.NotEmpty(results);
+        Assert.All(results, result => Assert.True(result.IsSuccess, result.Message));
+    }
+
+    [Fact]
+    public void EvaluateAll_FailsNumericComparisonAssertionsWhenFieldIsNotNumeric()
+    {
+        var response = JsonNode.Parse("""{ "message": "Account list details found." }""");
+
+        var assertions = new[]
+        {
+            new AssertionDefinition
+            {
+                Field = "message",
+                GreaterThan = 0
+            }
+        };
+
+        var results = _evaluator.EvaluateAll(assertions, response);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsSuccess);
+        Assert.Equal("greaterThan", result.Rule);
+        Assert.Contains("not a number", result.Message);
+    }
 }

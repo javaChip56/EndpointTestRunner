@@ -278,6 +278,10 @@ public sealed class ApiTestExecutor : IApiTestExecutor
             MinCount = _variableResolver.ResolveValue(assertion.MinCount, environment),
             MaxCount = _variableResolver.ResolveValue(assertion.MaxCount, environment),
             Count = _variableResolver.ResolveValue(assertion.Count, environment),
+            GreaterThan = _variableResolver.ResolveValue(assertion.GreaterThan, environment),
+            GreaterThanOrEqual = _variableResolver.ResolveValue(assertion.GreaterThanOrEqual, environment),
+            LessThan = _variableResolver.ResolveValue(assertion.LessThan, environment),
+            LessThanOrEqual = _variableResolver.ResolveValue(assertion.LessThanOrEqual, environment),
             Contains = assertion.Contains.Count == 0
                 ? new Dictionary<string, object?>()
                 : assertion.Contains.ToDictionary(

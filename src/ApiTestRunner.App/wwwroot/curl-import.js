@@ -31,6 +31,10 @@ const assertionRuleDefinitions = {
             { label: "false", value: false }
         ]
     },
+    greaterThan: { label: "greaterThan", valueMode: "number" },
+    greaterThanOrEqual: { label: "greaterThanOrEqual", valueMode: "number" },
+    lessThan: { label: "lessThan", valueMode: "number" },
+    lessThanOrEqual: { label: "lessThanOrEqual", valueMode: "number" },
     minCount: { label: "minCount", valueMode: "number" },
     maxCount: { label: "maxCount", valueMode: "number" },
     count: { label: "count", valueMode: "number" }
@@ -307,6 +311,15 @@ function getRulesForFieldType(fieldType) {
         case "object":
             return ["type", "notEmpty"];
         case "number":
+            return [
+                "equals",
+                "notEquals",
+                "type",
+                "greaterThan",
+                "greaterThanOrEqual",
+                "lessThan",
+                "lessThanOrEqual"
+            ];
         case "boolean":
             return ["equals", "notEquals", "type"];
         default:

@@ -261,6 +261,58 @@ public sealed class AssertionEvaluator : IAssertionEvaluator
             }
         }
 
+        if (assertion.GreaterThan is not null)
+        {
+            rulesAdded++;
+            EvaluateNumericComparison(
+                assertion.Field,
+                "greaterThan",
+                assertion.GreaterThan,
+                actualNode,
+                (actual, expected) => actual > expected,
+                "greater than",
+                results);
+        }
+
+        if (assertion.GreaterThanOrEqual is not null)
+        {
+            rulesAdded++;
+            EvaluateNumericComparison(
+                assertion.Field,
+                "greaterThanOrEqual",
+                assertion.GreaterThanOrEqual,
+                actualNode,
+                (actual, expected) => actual >= expected,
+                "greater than or equal to",
+                results);
+        }
+
+        if (assertion.LessThan is not null)
+        {
+            rulesAdded++;
+            EvaluateNumericComparison(
+                assertion.Field,
+                "lessThan",
+                assertion.LessThan,
+                actualNode,
+                (actual, expected) => actual < expected,
+                "less than",
+                results);
+        }
+
+        if (assertion.LessThanOrEqual is not null)
+        {
+            rulesAdded++;
+            EvaluateNumericComparison(
+                assertion.Field,
+                "lessThanOrEqual",
+                assertion.LessThanOrEqual,
+                actualNode,
+                (actual, expected) => actual <= expected,
+                "less than or equal to",
+                results);
+        }
+
         if (assertion.Contains.Count > 0)
         {
             rulesAdded++;
@@ -336,6 +388,45 @@ public sealed class AssertionEvaluator : IAssertionEvaluator
     private static int? GetArrayCount(JsonNode? node)
     {
         return node is JsonArray array ? array.Count : null;
+    }
+
+    private static void EvaluateNumericComparison(
+        string field,
+        string rule,
+        object? expectedValue,
+        JsonNode? actualNode,
+        Func<decimal, decimal, bool> comparator,
+        string comparisonText,
+        ICollection<AssertionResult> results)
+    {
+        if (!TryConvertToDecimal(expectedValue, out var expectedNumber))
+        {
+            results.Add(CreateResult(
+                field,
+                rule,
+                false,
+                $"{rule} must resolve to a number."));
+            return;
+        }
+
+        if (!TryGetNumericValue(actualNode, out var actualNumber))
+        {
+            results.Add(CreateResult(
+                field,
+                rule,
+                false,
+                "Field was not a number."));
+            return;
+        }
+
+        var success = comparator(actualNumber, expectedNumber);
+        results.Add(CreateResult(
+            field,
+            rule,
+            success,
+            success
+                ? $"Value was {comparisonText} {FormatDecimal(expectedNumber)}."
+                : $"Value was {FormatDecimal(actualNumber)}, expected {comparisonText} {FormatDecimal(expectedNumber)}."));
     }
 
     private static bool ArrayContainsMatch(JsonNode? node, IReadOnlyDictionary<string, object?> expectedFields)
@@ -432,5 +523,78 @@ public sealed class AssertionEvaluator : IAssertionEvaluator
                 result = 0;
                 return false;
         }
+    }
+
+    private static bool TryGetNumericValue(JsonNode? node, out decimal result)
+    {
+        switch (node)
+        {
+            case JsonValue value when value.TryGetValue<decimal>(out var decimalValue):
+                result = decimalValue;
+                return true;
+            case JsonValue value when value.TryGetValue<double>(out var doubleValue):
+                result = Convert.ToDecimal(doubleValue, CultureInfo.InvariantCulture);
+                return true;
+            case JsonValue value when value.TryGetValue<long>(out var longValue):
+                result = longValue;
+                return true;
+            case JsonValue value when value.TryGetValue<int>(out var intValue):
+                result = intValue;
+                return true;
+            default:
+                result = 0;
+                return false;
+        }
+    }
+
+    private static bool TryConvertToDecimal(object? value, out decimal result)
+    {
+        switch (value)
+        {
+            case sbyte number:
+                result = number;
+                return true;
+            case byte number:
+                result = number;
+                return true;
+            case short number:
+                result = number;
+                return true;
+            case ushort number:
+                result = number;
+                return true;
+            case int number:
+                result = number;
+                return true;
+            case uint number:
+                result = number;
+                return true;
+            case long number:
+                result = number;
+                return true;
+            case ulong number:
+                result = number;
+                return true;
+            case float number:
+                result = Convert.ToDecimal(number, CultureInfo.InvariantCulture);
+                return true;
+            case double number:
+                result = Convert.ToDecimal(number, CultureInfo.InvariantCulture);
+                return true;
+            case decimal number:
+                result = number;
+                return true;
+            case string text when decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed):
+                result = parsed;
+                return true;
+            default:
+                result = 0;
+                return false;
+        }
+    }
+
+    private static string FormatDecimal(decimal value)
+    {
+        return value.ToString("0.############################", CultureInfo.InvariantCulture);
     }
 }
