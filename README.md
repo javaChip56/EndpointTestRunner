@@ -126,7 +126,7 @@ Current first-version scope:
 - best support is for common `curl`, `-X`, `-H`, `--data`, `--data-raw`, `--data-binary`, and `--url` forms
 - the page now uses one main `Analyze and Generate` action instead of separate request-analysis and response-parse steps
 - generated YAML is shown as preview text, not written directly to disk
-- the assertion builder currently targets the most common field assertions: `equals`, `notEquals`, `type`, `containsText`, `startsWith`, `endsWith`, `notEmpty`, `minCount`, `maxCount`, and `count`
+- the assertion builder currently targets the most common field assertions: `equals`, `notEquals`, `type`, `containsText`, `startsWith`, `endsWith`, `notEmpty`, `greaterThan`, `greaterThanOrEqual`, `lessThan`, `lessThanOrEqual`, `minCount`, `maxCount`, and `count`
 - missing YAML warnings are surfaced in the cURL import UI, but malformed YAML content still needs to be fixed before the dashboard runner can execute the suite
 
 ## CI/CD
@@ -259,6 +259,10 @@ The runner currently supports these assertion keys:
 - `startsWith`
 - `endsWith`
 - `notEmpty`
+- `greaterThan`
+- `greaterThanOrEqual`
+- `lessThan`
+- `lessThanOrEqual`
 - `minCount`
 - `maxCount`
 - `count`
@@ -289,6 +293,9 @@ assertions:
   - field: data.accounts
     type: array
     minCount: 1
+
+  - field: data.totalRowsCount
+    greaterThan: 0
 
   - field: data.accounts
     contains:
@@ -360,7 +367,7 @@ Notes:
 - A token can occupy the whole value or be embedded inside a larger string.
 - Environment variables can reference other environment variables.
 - `config:` reads from application configuration, so `config:Variables.DefaultCustomerId` maps to `Variables:DefaultCustomerId`.
-- Assertions support tokens in `field`, `equals`, `notEquals`, `type`, `containsText`, `startsWith`, `endsWith`, `contains`, `notEmpty`, `minCount`, `maxCount`, and `count`.
+- Assertions support tokens in `field`, `equals`, `notEquals`, `type`, `containsText`, `startsWith`, `endsWith`, `contains`, `notEmpty`, `greaterThan`, `greaterThanOrEqual`, `lessThan`, `lessThanOrEqual`, `minCount`, `maxCount`, and `count`.
 
 ## Recommended split layout
 

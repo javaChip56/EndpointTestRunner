@@ -80,5 +80,13 @@ public sealed record class AssertionDefinition
 
     public object? Count { get; init; }
 
+    public object? GreaterThan { get; init; }
+
+    public object? GreaterThanOrEqual { get; init; }
+
+    public object? LessThan { get; init; }
+
+    public object? LessThanOrEqual { get; init; }
+
     public Dictionary<string, object?> Contains { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 }
