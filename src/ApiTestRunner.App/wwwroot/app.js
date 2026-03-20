@@ -6,6 +6,9 @@ const expandSelectionButton = document.getElementById("expandSelectionButton");
 const collapseSelectionButton = document.getElementById("collapseSelectionButton");
 const expandResultsButton = document.getElementById("expandResultsButton");
 const collapseResultsButton = document.getElementById("collapseResultsButton");
+const showAllResultsButton = document.getElementById("showAllResultsButton");
+const showPassingResultsButton = document.getElementById("showPassingResultsButton");
+const showFailingResultsButton = document.getElementById("showFailingResultsButton");
 const selectionSearchInput = document.getElementById("selectionSearchInput");
 const resultsSearchInput = document.getElementById("resultsSearchInput");
 const selectionContainer = document.getElementById("selectionContainer");
@@ -21,6 +24,8 @@ let selectedTestIds = new Set();
 let lastRunState = null;
 let selectionSearchTerm = "";
 let resultsSearchTerm = "";
+let resultsStatusFilter = "all";
+let resultExpansionOverride = null;
 
 const selectionExpansionState = {
     environments: new Map(),
@@ -337,7 +342,9 @@ function renderState(state) {
     lastRunState = state;
     const run = state.lastRun;
     const searchDisplayTerm = resultsSearchInput.value.trim();
+    const autoExpandResults = Boolean(resultsSearchTerm) || resultsStatusFilter !== "all";
     setStatusError(Boolean(state.lastError));
+    updateResultFilterButtons();
 
     document.getElementById("runStatus").textContent = buildStatusText(state);
     document.getElementById("startedAt").textContent = `Started: ${formatDate(state.lastStartedAtUtc)}`;
@@ -361,21 +368,32 @@ function renderState(state) {
         return;
     }
 
-    const filteredEnvironments = filterRunEnvironments(run, resultsSearchTerm);
+    const filteredEnvironments = filterRunEnvironments(run, resultsSearchTerm, resultsStatusFilter);
     const visibleEndpointCount = filteredEnvironments.reduce((count, environmentEntry) => count + environmentEntry.endpoints.length, 0);
     const visibleTestCount = filteredEnvironments.reduce(
         (count, environmentEntry) => count + environmentEntry.endpoints.reduce((endpointCount, endpointEntry) => endpointCount + endpointEntry.tests.length, 0),
         0
     );
+    const visiblePassedTestCount = filteredEnvironments.reduce(
+        (count, environmentEntry) => count + environmentEntry.endpoints.reduce(
+            (endpointCount, endpointEntry) => endpointCount + endpointEntry.tests.filter((test) => test.isSuccess).length,
+            0),
+        0
+    );
+    const visibleFailedTestCount = visibleTestCount - visiblePassedTestCount;
 
-    resultsSummary.textContent = resultsSearchTerm
-        ? `${run.passedTests} passed, ${run.failedTests} failed overall | ${visibleEndpointCount} endpoints and ${visibleTestCount} tests shown for "${searchDisplayTerm}"`
-        : `${run.passedTests} passed, ${run.failedTests} failed across ${run.environments.length} environments.`;
+    resultsSummary.textContent = buildResultsSummary(
+        run,
+        visibleEndpointCount,
+        visibleTestCount,
+        visiblePassedTestCount,
+        visibleFailedTestCount,
+        searchDisplayTerm);
     updateResultButtons(true);
     synchronizeResultExpansionState(run);
 
     if (filteredEnvironments.length === 0) {
-        environmentContainer.innerHTML = `<section class="empty-state"><h3>No matching results</h3><p>No APIs, endpoints, tests, assertions, or errors match "${escapeHtml(searchDisplayTerm)}".</p></section>`;
+        environmentContainer.innerHTML = `<section class="empty-state"><h3>No matching results</h3><p>${buildEmptyResultsMessage(searchDisplayTerm)}</p></section>`;
         return;
     }
 
@@ -387,19 +405,26 @@ function renderState(state) {
         const visibleFailedTests = visibleTests.length - visiblePassedTests;
 
         const environmentNode = environmentTemplate.content.firstElementChild.cloneNode(true);
-        environmentNode.open = resultsSearchTerm ? true : resultExpansionState.environments.get(environmentKey) ?? environment.failedTests > 0;
+        environmentNode.open = resultExpansionOverride ?? (autoExpandResults ? true : resultExpansionState.environments.get(environmentKey) ?? environment.failedTests > 0);
         environmentNode.addEventListener("toggle", () => {
             resultExpansionState.environments.set(environmentKey, environmentNode.open);
         });
 
         environmentNode.querySelector(".environment-name").innerHTML = highlightMatch(environment.name, resultsSearchTerm);
         environmentNode.querySelector(".environment-url").innerHTML = highlightMatch(environment.baseUrl, resultsSearchTerm);
-        environmentNode.querySelector(".environment-stats").textContent = resultsSearchTerm && !environmentMatches
-            ? `${visiblePassedTests} passed, ${visibleFailedTests} failed, ${visibleTests.length} matching tests`
-            : `${environment.passedTests} passed, ${environment.failedTests} failed, ${environment.totalTests} total`;
+        const environmentStats = environmentNode.querySelector(".environment-stats");
+        const statsPassedCount = (resultsSearchTerm || resultsStatusFilter !== "all") ? visiblePassedTests : environment.passedTests;
+        const statsFailedCount = (resultsSearchTerm || resultsStatusFilter !== "all") ? visibleFailedTests : environment.failedTests;
+        const statsTotalCount = (resultsSearchTerm || resultsStatusFilter !== "all") ? visibleTests.length : environment.totalTests;
+        const statsTotalLabel = (resultsSearchTerm || resultsStatusFilter !== "all") ? "matching tests" : "total";
+        environmentStats.innerHTML = [
+            `<span class="stats-pass">${statsPassedCount} passed</span>`,
+            `<span class="stats-fail">${statsFailedCount} failed</span>`,
+            `<span class="stats-total">${statsTotalCount} ${statsTotalLabel}</span>`
+        ].join(", ");
 
         const environmentBadge = environmentNode.querySelector(".environment-badge");
-        const environmentIsPassing = resultsSearchTerm ? visibleFailedTests === 0 : environment.failedTests === 0;
+        const environmentIsPassing = (resultsSearchTerm || resultsStatusFilter !== "all") ? visibleFailedTests === 0 : environment.failedTests === 0;
         environmentBadge.textContent = environmentIsPassing ? "Passing" : "Issues";
         environmentBadge.className = `environment-badge ${environmentIsPassing ? "passing" : "failing"}`;
 
@@ -409,7 +434,7 @@ function renderState(state) {
             const { endpoint, endpointMatches, tests } = endpointEntry;
             const endpointKey = getResultEndpointKey(environment, endpoint);
             const endpointNode = endpointTemplate.content.firstElementChild.cloneNode(true);
-            endpointNode.open = resultsSearchTerm ? true : resultExpansionState.endpoints.get(endpointKey) ?? !endpoint.isSuccess;
+            endpointNode.open = resultExpansionOverride ?? (autoExpandResults ? true : resultExpansionState.endpoints.get(endpointKey) ?? !endpoint.isSuccess);
             endpointNode.addEventListener("toggle", () => {
                 resultExpansionState.endpoints.set(endpointKey, endpointNode.open);
             });
@@ -420,7 +445,7 @@ function renderState(state) {
 
             const endpointBadge = endpointNode.querySelector(".endpoint-badge");
             const endpointVisibleFailedTests = tests.filter((test) => !test.isSuccess).length;
-            const endpointIsPassing = resultsSearchTerm ? endpointVisibleFailedTests === 0 : endpoint.isSuccess;
+            const endpointIsPassing = (resultsSearchTerm || resultsStatusFilter !== "all") ? endpointVisibleFailedTests === 0 : endpoint.isSuccess;
             endpointBadge.textContent = endpointIsPassing ? "Pass" : "Fail";
             endpointBadge.className = `endpoint-badge ${endpointIsPassing ? "passing" : "failing"}`;
 
@@ -434,7 +459,7 @@ function renderState(state) {
             tests.forEach((test, testIndex) => {
                 const testKey = getResultTestKey(environment, endpoint, test, testIndex);
                 const testNode = testTemplate.content.firstElementChild.cloneNode(true);
-                testNode.open = resultsSearchTerm ? true : resultExpansionState.tests.get(testKey) ?? !test.isSuccess;
+                testNode.open = resultExpansionOverride ?? (autoExpandResults ? true : resultExpansionState.tests.get(testKey) ?? !test.isSuccess);
                 testNode.addEventListener("toggle", () => {
                     resultExpansionState.tests.set(testKey, testNode.open);
                 });
@@ -498,8 +523,8 @@ function initializeResponsePreview(endpointNode, responseText) {
     });
 }
 
-function filterRunEnvironments(run, searchTerm) {
-    if (!searchTerm) {
+function filterRunEnvironments(run, searchTerm, statusFilter) {
+    if (!searchTerm && statusFilter === "all") {
         return run.environments.map((environment) => ({
             environment,
             environmentMatches: false,
@@ -520,17 +545,18 @@ function filterRunEnvironments(run, searchTerm) {
             const endpoints = environment.endpoints
                 .map((endpoint) => {
                     const endpointMatches = environmentMatches || endpointMatchesRunSearch(endpoint, searchTerm);
+                    const visibleTests = endpoint.tests.filter((test) => shouldIncludeResultTest(test, statusFilter));
                     return {
                         endpoint,
                         endpointMatches,
                         tests: endpointMatches
-                            ? endpoint.tests
-                            : endpoint.tests.filter((test) => testMatchesRunSearch(test, searchTerm))
+                            ? visibleTests
+                            : visibleTests.filter((test) => testMatchesRunSearch(test, searchTerm))
                     };
                 })
-                .filter((endpointEntry) => endpointEntry.endpointMatches || endpointEntry.tests.length > 0);
+                .filter((endpointEntry) => endpointEntry.tests.length > 0);
 
-            if (!environmentMatches && endpoints.length === 0) {
+            if (endpoints.length === 0) {
                 return null;
             }
 
@@ -541,6 +567,18 @@ function filterRunEnvironments(run, searchTerm) {
             };
         })
         .filter((entry) => entry !== null);
+}
+
+function shouldIncludeResultTest(test, statusFilter) {
+    if (statusFilter === "passing") {
+        return test.isSuccess;
+    }
+
+    if (statusFilter === "failing") {
+        return !test.isSuccess;
+    }
+
+    return true;
 }
 
 function endpointMatchesRunSearch(endpoint, searchTerm) {
@@ -693,6 +731,15 @@ function updateSelectionButtons(isEnabled) {
 function updateResultButtons(isEnabled) {
     expandResultsButton.disabled = !isEnabled;
     collapseResultsButton.disabled = !isEnabled;
+    showAllResultsButton.disabled = !isEnabled;
+    showPassingResultsButton.disabled = !isEnabled;
+    showFailingResultsButton.disabled = !isEnabled;
+}
+
+function updateResultFilterButtons() {
+    showAllResultsButton.classList.toggle("is-active", resultsStatusFilter === "all");
+    showPassingResultsButton.classList.toggle("is-active", resultsStatusFilter === "passing");
+    showFailingResultsButton.classList.toggle("is-active", resultsStatusFilter === "failing");
 }
 
 function setStatusError(hasError) {
@@ -733,6 +780,8 @@ function setResultExpansion(isOpen) {
         return;
     }
 
+    resultExpansionOverride = isOpen;
+
     for (const environment of run.environments) {
         resultExpansionState.environments.set(getResultEnvironmentKey(environment), isOpen);
 
@@ -746,6 +795,53 @@ function setResultExpansion(isOpen) {
     }
 
     renderState(lastRunState);
+}
+
+function setResultsStatusFilter(filter) {
+    resultsStatusFilter = filter;
+    resultExpansionOverride = null;
+    updateResultFilterButtons();
+
+    if (lastRunState) {
+        renderState(lastRunState);
+    }
+}
+
+function buildResultsSummary(run, visibleEndpointCount, visibleTestCount, visiblePassedTestCount, visibleFailedTestCount, searchDisplayTerm) {
+    if (!resultsSearchTerm && resultsStatusFilter === "all") {
+        return `${run.passedTests} passed, ${run.failedTests} failed across ${run.environments.length} environments.`;
+    }
+
+    const filterDescription = resultsStatusFilter === "passing"
+        ? "passing tests"
+        : resultsStatusFilter === "failing"
+            ? "failing tests"
+            : "tests";
+    const searchDescription = resultsSearchTerm ? ` for "${searchDisplayTerm}"` : "";
+
+    return `${run.passedTests} passed, ${run.failedTests} failed overall | showing ${visiblePassedTestCount} passed and ${visibleFailedTestCount} failed across ${visibleEndpointCount} endpoints and ${visibleTestCount} ${filterDescription}${searchDescription}`;
+}
+
+function buildEmptyResultsMessage(searchDisplayTerm) {
+    const filterDescription = resultsStatusFilter === "passing"
+        ? "passing"
+        : resultsStatusFilter === "failing"
+            ? "failing"
+            : "visible";
+
+    if (resultsSearchTerm) {
+        return `No ${filterDescription} APIs, endpoints, tests, assertions, or errors match "${escapeHtml(searchDisplayTerm)}".`;
+    }
+
+    if (resultsStatusFilter === "passing") {
+        return "No passing tests are visible in the latest results.";
+    }
+
+    if (resultsStatusFilter === "failing") {
+        return "No failing tests are visible in the latest results.";
+    }
+
+    return "No results are visible in the latest run.";
 }
 
 function matchesSearch(value, searchTerm) {
@@ -800,6 +896,9 @@ expandSelectionButton.addEventListener("click", () => setSelectionExpansion(true
 collapseSelectionButton.addEventListener("click", () => setSelectionExpansion(false));
 expandResultsButton.addEventListener("click", () => setResultExpansion(true));
 collapseResultsButton.addEventListener("click", () => setResultExpansion(false));
+showAllResultsButton.addEventListener("click", () => setResultsStatusFilter("all"));
+showPassingResultsButton.addEventListener("click", () => setResultsStatusFilter("passing"));
+showFailingResultsButton.addEventListener("click", () => setResultsStatusFilter("failing"));
 selectionSearchInput.addEventListener("input", () => {
     selectionSearchTerm = selectionSearchInput.value.trim().toLowerCase();
 
@@ -809,6 +908,7 @@ selectionSearchInput.addEventListener("input", () => {
 });
 resultsSearchInput.addEventListener("input", () => {
     resultsSearchTerm = resultsSearchInput.value.trim().toLowerCase();
+    resultExpansionOverride = null;
 
     if (lastRunState) {
         renderState(lastRunState);
