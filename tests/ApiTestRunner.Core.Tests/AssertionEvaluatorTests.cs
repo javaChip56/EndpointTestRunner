@@ -176,4 +176,87 @@ public sealed class AssertionEvaluatorTests
         Assert.Equal("greaterThan", result.Rule);
         Assert.Contains("not a number", result.Message);
     }
+
+    [Fact]
+    public void EvaluateAll_SupportsNumericComparisonInsideContains()
+    {
+        var response = JsonNode.Parse("""
+            {
+              "data": {
+                "accounts": [
+                  {
+                    "accountNo": "ACC-1001",
+                    "portfolioValue": 3116.61,
+                    "status": "Active"
+                  },
+                  {
+                    "accountNo": "ACC-1002",
+                    "portfolioValue": 0,
+                    "status": "Inactive"
+                  }
+                ]
+              }
+            }
+            """);
+
+        var assertions = new[]
+        {
+            new AssertionDefinition
+            {
+                Field = "data.accounts",
+                Contains = new Dictionary<string, object?>
+                {
+                    ["portfolioValue"] = new Dictionary<string, object?>
+                    {
+                        ["greaterThan"] = 1000
+                    },
+                    ["status"] = "Active"
+                }
+            }
+        };
+
+        var results = _evaluator.EvaluateAll(assertions, response);
+
+        var result = Assert.Single(results);
+        Assert.True(result.IsSuccess, result.Message);
+    }
+
+    [Fact]
+    public void EvaluateAll_FailsContainsWhenNestedNumericComparisonDoesNotMatch()
+    {
+        var response = JsonNode.Parse("""
+            {
+              "data": {
+                "accounts": [
+                  {
+                    "accountNo": "ACC-1001",
+                    "portfolioValue": 3116.61,
+                    "status": "Active"
+                  }
+                ]
+              }
+            }
+            """);
+
+        var assertions = new[]
+        {
+            new AssertionDefinition
+            {
+                Field = "data.accounts",
+                Contains = new Dictionary<string, object?>
+                {
+                    ["portfolioValue"] = new Dictionary<string, object?>
+                    {
+                        ["lessThan"] = 1000
+                    }
+                }
+            }
+        };
+
+        var results = _evaluator.EvaluateAll(assertions, response);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsSuccess);
+        Assert.Equal("contains", result.Rule);
+    }
 }

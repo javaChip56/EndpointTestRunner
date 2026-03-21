@@ -6,6 +6,25 @@ namespace ApiTestRunner.Core.Services;
 
 public sealed class AssertionEvaluator : IAssertionEvaluator
 {
+    private static readonly HashSet<string> ContainsRuleNames =
+    [
+        "equals",
+        "notEquals",
+        "type",
+        "containsText",
+        "startsWith",
+        "endsWith",
+        "notEmpty",
+        "greaterThan",
+        "greaterThanOrEqual",
+        "lessThan",
+        "lessThanOrEqual",
+        "minCount",
+        "maxCount",
+        "count",
+        "contains"
+    ];
+
     public IReadOnlyList<AssertionResult> EvaluateAll(
         IReadOnlyList<AssertionDefinition> assertions,
         JsonNode? responseJson)
@@ -442,10 +461,8 @@ public sealed class AssertionEvaluator : IAssertionEvaluator
 
             foreach (var expectedField in expectedFields)
             {
-                var expectedValue = JsonNodeConversion.ToJsonNode(expectedField.Value);
-
                 if (!JsonFieldNavigator.TryGetNode(item, expectedField.Key, out var actualValue) ||
-                    !JsonNode.DeepEquals(actualValue, expectedValue))
+                    !MatchesContainsExpectation(actualValue, expectedField.Value))
                 {
                     matchedAllFields = false;
                     break;
@@ -459,6 +476,240 @@ public sealed class AssertionEvaluator : IAssertionEvaluator
         }
 
         return false;
+    }
+
+    private static bool MatchesContainsExpectation(JsonNode? actualValue, object? expectedValue)
+    {
+        if (!TryGetContainsRuleSpec(expectedValue, out var ruleSpec))
+        {
+            var expectedNode = JsonNodeConversion.ToJsonNode(expectedValue);
+            return JsonNode.DeepEquals(actualValue, expectedNode);
+        }
+
+        foreach (var rule in ruleSpec)
+        {
+            switch (rule.Key)
+            {
+                case "equals":
+                {
+                    var expectedNode = JsonNodeConversion.ToJsonNode(rule.Value);
+                    if (!JsonNode.DeepEquals(actualValue, expectedNode))
+                    {
+                        return false;
+                    }
+
+                    break;
+                }
+                case "notEquals":
+                {
+                    var unexpectedNode = JsonNodeConversion.ToJsonNode(rule.Value);
+                    if (JsonNode.DeepEquals(actualValue, unexpectedNode))
+                    {
+                        return false;
+                    }
+
+                    break;
+                }
+                case "type":
+                {
+                    if (rule.Value is not string expectedType ||
+                        !string.Equals(GetNodeType(actualValue), expectedType.Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+
+                    break;
+                }
+                case "containsText":
+                {
+                    var actualText = TryGetString(actualValue);
+                    if (actualText is null ||
+                        rule.Value is not string expectedText ||
+                        !actualText.Contains(expectedText, StringComparison.Ordinal))
+                    {
+                        return false;
+                    }
+
+                    break;
+                }
+                case "startsWith":
+                {
+                    var actualText = TryGetString(actualValue);
+                    if (actualText is null ||
+                        rule.Value is not string expectedPrefix ||
+                        !actualText.StartsWith(expectedPrefix, StringComparison.Ordinal))
+                    {
+                        return false;
+                    }
+
+                    break;
+                }
+                case "endsWith":
+                {
+                    var actualText = TryGetString(actualValue);
+                    if (actualText is null ||
+                        rule.Value is not string expectedSuffix ||
+                        !actualText.EndsWith(expectedSuffix, StringComparison.Ordinal))
+                    {
+                        return false;
+                    }
+
+                    break;
+                }
+                case "notEmpty":
+                {
+                    if (!TryConvertToBoolean(rule.Value, out var expectedNotEmpty))
+                    {
+                        return false;
+                    }
+
+                    if ((expectedNotEmpty && !IsNotEmpty(actualValue)) ||
+                        (!expectedNotEmpty && IsNotEmpty(actualValue)))
+                    {
+                        return false;
+                    }
+
+                    break;
+                }
+                case "greaterThan":
+                    if (!MatchesNumericComparison(actualValue, rule.Value, (actual, expected) => actual > expected))
+                    {
+                        return false;
+                    }
+
+                    break;
+                case "greaterThanOrEqual":
+                    if (!MatchesNumericComparison(actualValue, rule.Value, (actual, expected) => actual >= expected))
+                    {
+                        return false;
+                    }
+
+                    break;
+                case "lessThan":
+                    if (!MatchesNumericComparison(actualValue, rule.Value, (actual, expected) => actual < expected))
+                    {
+                        return false;
+                    }
+
+                    break;
+                case "lessThanOrEqual":
+                    if (!MatchesNumericComparison(actualValue, rule.Value, (actual, expected) => actual <= expected))
+                    {
+                        return false;
+                    }
+
+                    break;
+                case "minCount":
+                    if (!TryConvertToInteger(rule.Value, out var minCount) ||
+                        GetArrayCount(actualValue) is not int actualMinCount ||
+                        actualMinCount < minCount)
+                    {
+                        return false;
+                    }
+
+                    break;
+                case "maxCount":
+                    if (!TryConvertToInteger(rule.Value, out var maxCount) ||
+                        GetArrayCount(actualValue) is not int actualMaxCount ||
+                        actualMaxCount > maxCount)
+                    {
+                        return false;
+                    }
+
+                    break;
+                case "count":
+                    if (!TryConvertToInteger(rule.Value, out var expectedCount) ||
+                        GetArrayCount(actualValue) is not int actualCount ||
+                        actualCount != expectedCount)
+                    {
+                        return false;
+                    }
+
+                    break;
+                case "contains":
+                {
+                    var nestedContains = NormalizeContainsRuleValue(rule.Value);
+                    if (nestedContains.Count == 0 || !ArrayContainsMatch(actualValue, nestedContains))
+                    {
+                        return false;
+                    }
+
+                    break;
+                }
+                default:
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool MatchesNumericComparison(
+        JsonNode? actualValue,
+        object? expectedValue,
+        Func<decimal, decimal, bool> comparator)
+    {
+        return TryConvertToDecimal(expectedValue, out var expectedNumber) &&
+               TryGetNumericValue(actualValue, out var actualNumber) &&
+               comparator(actualNumber, expectedNumber);
+    }
+
+    private static bool TryGetContainsRuleSpec(object? value, out Dictionary<string, object?> ruleSpec)
+    {
+        ruleSpec = [];
+
+        switch (value)
+        {
+            case IReadOnlyDictionary<string, object?> readOnlyDictionary:
+                ruleSpec = readOnlyDictionary.ToDictionary(
+                    pair => pair.Key,
+                    pair => pair.Value,
+                    StringComparer.OrdinalIgnoreCase);
+                break;
+            case IDictionary<string, object?> dictionary:
+                ruleSpec = dictionary.ToDictionary(
+                    pair => pair.Key,
+                    pair => pair.Value,
+                    StringComparer.OrdinalIgnoreCase);
+                break;
+            case IDictionary<object, object?> objectDictionary:
+                ruleSpec = objectDictionary
+                    .Where(pair => pair.Key is not null)
+                    .ToDictionary(
+                        pair => Convert.ToString(pair.Key, CultureInfo.InvariantCulture) ?? string.Empty,
+                        pair => pair.Value,
+                        StringComparer.OrdinalIgnoreCase);
+                break;
+            default:
+                return false;
+        }
+
+        return ruleSpec.Count > 0 && ruleSpec.Keys.All(key => ContainsRuleNames.Contains(key));
+    }
+
+    private static Dictionary<string, object?> NormalizeContainsRuleValue(object? value)
+    {
+        if (value is IReadOnlyDictionary<string, object?> readOnlyDictionary)
+        {
+            return new Dictionary<string, object?>(readOnlyDictionary, StringComparer.OrdinalIgnoreCase);
+        }
+
+        if (value is IDictionary<string, object?> dictionary)
+        {
+            return new Dictionary<string, object?>(dictionary, StringComparer.OrdinalIgnoreCase);
+        }
+
+        if (value is IDictionary<object, object?> objectDictionary)
+        {
+            return objectDictionary
+                .Where(pair => pair.Key is not null)
+                .ToDictionary(
+                    pair => Convert.ToString(pair.Key, CultureInfo.InvariantCulture) ?? string.Empty,
+                    pair => pair.Value,
+                    StringComparer.OrdinalIgnoreCase);
+        }
+
+        return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
     }
 
     private static string FormatNode(JsonNode? node)

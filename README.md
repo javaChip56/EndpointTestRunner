@@ -301,6 +301,12 @@ assertions:
   - field: data.accounts
     contains:
       status: Active
+
+  - field: data.accounts
+    contains:
+      portfolioValue:
+        greaterThan: 1000
+      status: Active
 ```
 
 ## Dynamic parameters and variables

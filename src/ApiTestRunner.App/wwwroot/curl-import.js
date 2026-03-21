@@ -10,6 +10,7 @@ const toggleResponseWrapButton = document.getElementById("toggleResponseWrapButt
 const testNameInput = document.getElementById("testNameInput");
 const expectedStatusInput = document.getElementById("expectedStatusInput");
 const testDraftList = document.getElementById("testDraftList");
+const assertionBuilderGrid = document.getElementById("assertionBuilderGrid");
 const assertionFieldSelect = document.getElementById("assertionFieldSelect");
 const assertionRuleSelect = document.getElementById("assertionRuleSelect");
 const assertionValueContainer = document.getElementById("assertionValueContainer");
@@ -27,6 +28,7 @@ const assertionRuleDefinitions = {
     containsText: { label: "containsText", valueMode: "text" },
     startsWith: { label: "startsWith", valueMode: "text" },
     endsWith: { label: "endsWith", valueMode: "text" },
+    contains: { label: "contains", valueMode: "typed" },
     notEmpty: {
         label: "notEmpty",
         valueMode: "select",
@@ -358,6 +360,9 @@ function renderRuleOptions() {
 }
 
 function renderValueInput() {
+    const previousContainsField = document.getElementById("assertionContainsFieldInput")?.value ?? "";
+    const previousContainsRule = document.getElementById("assertionContainsRuleInput")?.value ?? "";
+    const previousContainsValue = document.getElementById("assertionContainsValueInput")?.value ?? "";
     assertionValueContainer.innerHTML = "";
     const field = getSelectedField();
     const rule = assertionRuleSelect.value;
@@ -365,8 +370,13 @@ function renderValueInput() {
     const label = document.createElement("span");
     label.textContent = "Value";
     assertionValueContainer.appendChild(label);
+    const isContainsRule = rule === "contains";
+    assertionBuilderGrid.classList.toggle("has-complex-value", isContainsRule);
+    assertionValueContainer.classList.toggle("field-stack-wide", isContainsRule);
 
     if (!field || !rule) {
+        assertionBuilderGrid.classList.remove("has-complex-value");
+        assertionValueContainer.classList.remove("field-stack-wide");
         const input = document.createElement("input");
         input.className = "tool-input-inline";
         input.type = "text";
@@ -376,6 +386,11 @@ function renderValueInput() {
     }
 
     const definition = assertionRuleDefinitions[rule];
+
+    if (rule === "contains") {
+        renderContainsValueInput(field, previousContainsField, previousContainsRule, previousContainsValue);
+        return;
+    }
 
     if (definition.valueMode === "select") {
         const select = document.createElement("select");
@@ -415,6 +430,174 @@ function renderValueInput() {
     assertionValueContainer.appendChild(input);
 }
 
+function renderContainsValueInput(field, selectedRelativeField, selectedRelativeRule, selectedRelativeValue) {
+    const containsFieldOptions = getContainsFieldOptions(field?.sample);
+
+    if (containsFieldOptions.length === 0) {
+        const helper = document.createElement("span");
+        helper.className = "helper-text";
+        helper.textContent = "contains currently supports arrays of objects.";
+        assertionValueContainer.appendChild(helper);
+
+        const input = document.createElement("input");
+        input.className = "tool-input-inline";
+        input.type = "text";
+        input.disabled = true;
+        assertionValueContainer.appendChild(input);
+        return;
+    }
+
+    const layout = document.createElement("div");
+    layout.className = "contains-editor-grid";
+
+    const fieldStack = document.createElement("label");
+    fieldStack.className = "field-stack";
+
+    const fieldLabel = document.createElement("span");
+    fieldLabel.textContent = "Match field";
+    fieldStack.appendChild(fieldLabel);
+
+    const select = document.createElement("select");
+    select.id = "assertionContainsFieldInput";
+    select.className = "tool-select";
+
+    containsFieldOptions.forEach((optionDefinition) => {
+        const option = document.createElement("option");
+        option.value = optionDefinition.path;
+        option.textContent = `${optionDefinition.path} (${optionDefinition.type})`;
+        select.appendChild(option);
+    });
+
+    if (selectedRelativeField && containsFieldOptions.some((option) => option.path === selectedRelativeField)) {
+        select.value = selectedRelativeField;
+    }
+
+    select.addEventListener("change", () => {
+        renderValueInput();
+    });
+
+    fieldStack.appendChild(select);
+    layout.appendChild(fieldStack);
+
+    const selectedFieldDefinition = containsFieldOptions.find((option) => option.path === select.value) ?? containsFieldOptions[0];
+    const ruleStack = document.createElement("label");
+    ruleStack.className = "field-stack";
+
+    const ruleLabel = document.createElement("span");
+    ruleLabel.textContent = "Match rule";
+    ruleStack.appendChild(ruleLabel);
+
+    const ruleSelect = document.createElement("select");
+    ruleSelect.id = "assertionContainsRuleInput";
+    ruleSelect.className = "tool-select";
+
+    getContainsRulesForFieldType(selectedFieldDefinition.type).forEach((rule) => {
+        const option = document.createElement("option");
+        option.value = rule;
+        option.textContent = assertionRuleDefinitions[rule].label;
+        ruleSelect.appendChild(option);
+    });
+
+    if (selectedRelativeRule &&
+        getContainsRulesForFieldType(selectedFieldDefinition.type).includes(selectedRelativeRule))
+    {
+        ruleSelect.value = selectedRelativeRule;
+    }
+
+    ruleSelect.addEventListener("change", () => {
+        renderValueInput();
+    });
+
+    ruleStack.appendChild(ruleSelect);
+    layout.appendChild(ruleStack);
+
+    const valueStack = document.createElement("label");
+    valueStack.className = "field-stack";
+
+    const valueLabel = document.createElement("span");
+    valueLabel.textContent = "Match value";
+    valueStack.appendChild(valueLabel);
+
+    const valueInput = createContainsValueInput(selectedFieldDefinition, ruleSelect.value, selectedRelativeValue);
+    valueStack.appendChild(valueInput);
+    layout.appendChild(valueStack);
+
+    assertionValueContainer.appendChild(layout);
+}
+
+function createContainsValueInput(fieldDefinition, rule, previousValue) {
+    const definition = assertionRuleDefinitions[rule];
+
+    if (definition.valueMode === "select") {
+        const select = document.createElement("select");
+        select.id = "assertionContainsValueInput";
+        select.className = "tool-select";
+
+        definition.options.forEach((optionDefinition) => {
+            const option = document.createElement("option");
+            if (typeof optionDefinition === "string") {
+                option.value = optionDefinition;
+                option.textContent = optionDefinition;
+            } else {
+                option.value = String(optionDefinition.value);
+                option.textContent = optionDefinition.label;
+            }
+
+            select.appendChild(option);
+        });
+
+        if (previousValue) {
+            select.value = previousValue;
+        } else if (rule === "notEmpty") {
+            select.value = "true";
+        } else if (rule === "type") {
+            select.value = fieldDefinition.type;
+        }
+
+        return select;
+    }
+
+    const input = document.createElement("input");
+    input.id = "assertionContainsValueInput";
+    input.className = "tool-input-inline";
+
+    if (definition.valueMode === "number") {
+        input.type = "number";
+        input.step = "any";
+    } else {
+        input.type = "text";
+    }
+
+    input.value = previousValue || formatSample(fieldDefinition.sample);
+    return input;
+}
+
+function getContainsFieldOptions(sample) {
+    if (!Array.isArray(sample) || sample.length === 0) {
+        return [];
+    }
+
+    const fieldMap = new Map();
+
+    sample.forEach((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+            return;
+        }
+
+        collectResponseFields(item).forEach((field) => {
+            if (!fieldMap.has(field.path)) {
+                fieldMap.set(field.path, {
+                    path: field.path,
+                    type: field.type,
+                    sample: field.sample
+                });
+            }
+        });
+    });
+
+    return Array.from(fieldMap.values()).sort((left, right) => left.path.localeCompare(right.path));
+}
+
 function getSelectedField() {
     if (parsedResponseFields.length === 0) {
         return null;
@@ -430,7 +613,7 @@ function getRulesForFieldType(fieldType) {
         case "string":
             return [...commonRules, "containsText", "startsWith", "endsWith"];
         case "array":
-            return [...commonRules, "minCount", "maxCount", "count"];
+            return [...commonRules, "contains", "minCount", "maxCount", "count"];
         case "object":
             return ["type", "notEmpty"];
         case "number":
@@ -447,6 +630,23 @@ function getRulesForFieldType(fieldType) {
             return ["equals", "notEquals", "type"];
         default:
             return commonRules;
+    }
+}
+
+function getContainsRulesForFieldType(fieldType) {
+    switch (fieldType) {
+        case "string":
+            return ["equals", "notEquals", "containsText", "startsWith", "endsWith", "notEmpty"];
+        case "number":
+            return ["equals", "notEquals", "greaterThan", "greaterThanOrEqual", "lessThan", "lessThanOrEqual"];
+        case "boolean":
+            return ["equals", "notEquals"];
+        case "object":
+            return ["type", "notEmpty"];
+        case "array":
+            return ["notEmpty", "minCount", "maxCount", "count"];
+        default:
+            return ["equals", "notEquals"];
     }
 }
 
@@ -474,6 +674,31 @@ function addAssertionDraft() {
 }
 
 function convertAssertionValue(rule, fieldType, input) {
+    if (rule === "contains") {
+        const relativeFieldInput = document.getElementById("assertionContainsFieldInput");
+        const relativeRuleInput = document.getElementById("assertionContainsRuleInput");
+        const relativeValueInput = document.getElementById("assertionContainsValueInput");
+        const currentField = getSelectedField();
+        const containsFieldOptions = getContainsFieldOptions(currentField?.sample);
+        const containsField = containsFieldOptions.find((option) => option.path === relativeFieldInput?.value);
+        const containsRule = relativeRuleInput?.value || "equals";
+
+        if (!relativeFieldInput || !relativeRuleInput || !relativeValueInput || !containsField) {
+            return {};
+        }
+
+        const convertedValue = convertContainsFieldValue(
+            containsField,
+            containsRule,
+            relativeValueInput.value);
+
+        return {
+            [relativeFieldInput.value]: containsRule === "equals"
+                ? convertedValue
+                : { [containsRule]: convertedValue }
+        };
+    }
+
     const definition = assertionRuleDefinitions[rule];
 
     if (definition.valueMode === "select") {
@@ -508,6 +733,28 @@ function convertAssertionValue(rule, fieldType, input) {
             }
         default:
             return text;
+    }
+}
+
+function convertContainsFieldValue(fieldDefinition, rule, value) {
+    if (rule === "notEmpty") {
+        return value === "true";
+    }
+
+    switch (fieldDefinition.type) {
+        case "number":
+            return Number(value);
+        case "boolean":
+            return value === "true";
+        case "object":
+        case "array":
+            try {
+                return JSON.parse(value);
+            } catch {
+                return value;
+            }
+        default:
+            return value;
     }
 }
 

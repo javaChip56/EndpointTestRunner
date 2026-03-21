@@ -900,6 +900,21 @@ body.app-shell {
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.assertion-builder-grid.has-complex-value {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+}
+
+.field-stack-wide {
+    grid-column: 1 / -1;
+}
+
+.contains-editor-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    width: 100%;
+}
+
 .assertion-draft-list {
     margin-top: 0.9rem;
     display: grid;
@@ -1032,5 +1047,10 @@ body.app-shell {
 
     .test-draft-actions {
         align-items: stretch;
+    }
+
+    .assertion-builder-grid.has-complex-value,
+    .contains-editor-grid {
+        grid-template-columns: 1fr;
     }
 }
