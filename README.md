@@ -112,7 +112,7 @@ The tool will:
 
 - parse the request URL, method, headers, query string, and JSON body
 - optionally parse a pasted JSON response body in the same flow so the assertion builder stays on the same page
-- let you add assertion drafts first, then use the main `Analyze and Generate` action to include them in the endpoint YAML preview
+- let you create multiple drafted tests, each with its own expected status and assertion set, then use `Analyze and Generate` to include all of them in the endpoint YAML preview
 - scan the configured YAML suite for an existing environment whose `baseUrl` already covers the pasted request URL
 - scan for an existing endpoint with the same method and either the same relative path or a matching path template such as `/customers/{customerId}`
 - generate suggested environment YAML when the base URL is not already present
@@ -125,6 +125,7 @@ Current first-version scope:
 
 - best support is for common `curl`, `-X`, `-H`, `--data`, `--data-raw`, `--data-binary`, and `--url` forms
 - the page now uses one main `Analyze and Generate` action instead of separate request-analysis and response-parse steps
+- each drafted test in the cURL page keeps its own assertions, so you can generate multiple YAML tests for one endpoint in a single pass
 - generated YAML is shown as preview text, not written directly to disk
 - the assertion builder currently targets the most common field assertions: `equals`, `notEquals`, `type`, `containsText`, `startsWith`, `endsWith`, `notEmpty`, `greaterThan`, `greaterThanOrEqual`, `lessThan`, `lessThanOrEqual`, `minCount`, `maxCount`, and `count`
 - missing YAML warnings are surfaced in the cURL import UI, but malformed YAML content still needs to be fixed before the dashboard runner can execute the suite

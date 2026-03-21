@@ -115,12 +115,29 @@
                                 <div class="card-header border-0">
                                     <div class="tool-header">
                                         <div>
-                                            <h2 class="panel-title"><i class="fa-solid fa-list-ul panel-title-icon"></i>Assertion builder</h2>
-                                            <p class="panel-note mb-0">Choose a response field, define the rule, and then generate the endpoint YAML preview with those assertions included.</p>
+                                            <h2 class="panel-title"><i class="fa-solid fa-list-ul panel-title-icon"></i>Test builder</h2>
+                                            <p class="panel-note mb-0">Create one or more tests, each with its own expected status and assertions, then generate endpoint YAML with all drafted tests included.</p>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="card-body pt-0">
+                                    <div class="assertion-builder-grid">
+                                        <label class="field-stack">
+                                            <span>Test name</span>
+                                            <input id="testNameInput" class="tool-input-inline" type="text" placeholder="Account list should return data" />
+                                        </label>
+                                        <label class="field-stack">
+                                            <span>Expected status</span>
+                                            <input id="expectedStatusInput" class="tool-input-inline" type="number" min="100" max="599" step="1" value="200" />
+                                        </label>
+                                    </div>
+
+                                    <div class="tool-actions mt-3">
+                                        <button id="addTestButton" class="ghost-button" type="button"><i class="fa-solid fa-file-circle-plus button-icon"></i>Add Another Test</button>
+                                    </div>
+
+                                    <div id="testDraftList" class="test-draft-list"></div>
+
                                     <div class="assertion-builder-grid">
                                         <label class="field-stack">
                                             <span>Field</span>

@@ -97,6 +97,8 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
                 .ToArray()
             : [suggestedEnvironmentName];
 
+        var testDrafts = NormalizeTestDrafts(request, parsedRequest.Method, effectivePath);
+
         return new CurlAnalyzeResponse
         {
             Request = requestSummary,
@@ -126,7 +128,7 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
                         variableSuggestions.TransformedRequest,
                         effectivePath,
                         targetEnvironmentNames,
-                        request.Assertions)
+                        testDrafts)
             },
             Variables = new CurlVariableAnalysis
             {
@@ -732,14 +734,14 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
         CurlRequestSummary request,
         string endpointPath,
         IReadOnlyList<string> targetEnvironmentNames,
-        IReadOnlyList<CurlAssertionDraft> assertions)
+        IReadOnlyList<CurlTestDraft> tests)
     {
         var endpointDocument = new Dictionary<string, object?>
         {
             ["targetEnvironments"] = targetEnvironmentNames,
             ["endpoints"] = new[]
             {
-                BuildEndpointDocument(request, endpointPath, assertions)
+                BuildEndpointDocument(request, endpointPath, tests)
             }
         };
 
@@ -749,7 +751,7 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
     private Dictionary<string, object?> BuildEndpointDocument(
         CurlRequestSummary request,
         string endpointPath,
-        IReadOnlyList<CurlAssertionDraft> assertions)
+        IReadOnlyList<CurlTestDraft> tests)
     {
         var endpoint = new Dictionary<string, object?>
         {
@@ -776,20 +778,52 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
             endpoint["body"] = request.Body;
         }
 
-        var testDefinition = new Dictionary<string, object?>
-        {
-            ["name"] = $"{SuggestEndpointName(request.Method, endpointPath)} should return success",
-            ["expectedStatus"] = 200
-        };
+        endpoint["tests"] = BuildTestDocuments(request.Method, endpointPath, tests);
+        return endpoint;
+    }
 
-        var assertionDocuments = BuildAssertionDocuments(assertions);
-        if (assertionDocuments.Count > 0)
+    private static List<Dictionary<string, object?>> BuildTestDocuments(
+        string method,
+        string endpointPath,
+        IReadOnlyList<CurlTestDraft> tests)
+    {
+        var normalizedTests = tests
+            .Where(test => !string.IsNullOrWhiteSpace(test.Name))
+            .ToArray();
+
+        if (normalizedTests.Length == 0)
         {
-            testDefinition["assertions"] = assertionDocuments;
+            normalizedTests =
+            [
+                new CurlTestDraft
+                {
+                    Name = $"{SuggestEndpointName(method, endpointPath)} should return success",
+                    ExpectedStatus = 200,
+                    Assertions = []
+                }
+            ];
         }
 
-        endpoint["tests"] = new[] { testDefinition };
-        return endpoint;
+        var documents = new List<Dictionary<string, object?>>(normalizedTests.Length);
+
+        foreach (var test in normalizedTests)
+        {
+            var testDefinition = new Dictionary<string, object?>
+            {
+                ["name"] = test.Name,
+                ["expectedStatus"] = test.ExpectedStatus
+            };
+
+            var assertionDocuments = BuildAssertionDocuments(test.Assertions);
+            if (assertionDocuments.Count > 0)
+            {
+                testDefinition["assertions"] = assertionDocuments;
+            }
+
+            documents.Add(testDefinition);
+        }
+
+        return documents;
     }
 
     private static List<Dictionary<string, object?>> BuildAssertionDocuments(IReadOnlyList<CurlAssertionDraft> assertions)
@@ -815,6 +849,39 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
         }
 
         return documents;
+    }
+
+    private static IReadOnlyList<CurlTestDraft> NormalizeTestDrafts(
+        CurlAnalyzeRequest request,
+        string method,
+        string endpointPath)
+    {
+        if (request.Tests.Count > 0)
+        {
+            return request.Tests
+                .Where(test => !string.IsNullOrWhiteSpace(test.Name))
+                .Select(test => new CurlTestDraft
+                {
+                    Name = test.Name,
+                    ExpectedStatus = test.ExpectedStatus <= 0 ? 200 : test.ExpectedStatus,
+                    Assertions = test.Assertions
+                        .Where(assertion => !string.IsNullOrWhiteSpace(assertion.Field) && !string.IsNullOrWhiteSpace(assertion.Rule))
+                        .ToArray()
+                })
+                .ToArray();
+        }
+
+        return
+        [
+            new CurlTestDraft
+            {
+                Name = $"{SuggestEndpointName(method, endpointPath)} should return success",
+                ExpectedStatus = 200,
+                Assertions = request.Assertions
+                    .Where(assertion => !string.IsNullOrWhiteSpace(assertion.Field) && !string.IsNullOrWhiteSpace(assertion.Rule))
+                    .ToArray()
+            }
+        ];
     }
 
     private static object? ConvertAssertionValue(object? value)

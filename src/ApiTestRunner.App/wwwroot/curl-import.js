@@ -2,10 +2,14 @@ const analyzeButton = document.getElementById("analyzeButton");
 const analyzeStatus = document.getElementById("analyzeStatus");
 const responseStatus = document.getElementById("responseStatus");
 const addAssertionButton = document.getElementById("addAssertionButton");
+const addTestButton = document.getElementById("addTestButton");
 const curlInput = document.getElementById("curlInput");
 const responseBodyInput = document.getElementById("responseBodyInput");
 const formatResponseButton = document.getElementById("formatResponseButton");
 const toggleResponseWrapButton = document.getElementById("toggleResponseWrapButton");
+const testNameInput = document.getElementById("testNameInput");
+const expectedStatusInput = document.getElementById("expectedStatusInput");
+const testDraftList = document.getElementById("testDraftList");
 const assertionFieldSelect = document.getElementById("assertionFieldSelect");
 const assertionRuleSelect = document.getElementById("assertionRuleSelect");
 const assertionValueContainer = document.getElementById("assertionValueContainer");
@@ -42,7 +46,9 @@ const assertionRuleDefinitions = {
 
 let parsedResponseFields = [];
 let parsedResponseObject = null;
-let assertionDrafts = [];
+let testDrafts = [];
+let currentTestDraftId = null;
+let nextTestDraftNumber = 1;
 let lastParsedResponseBody = "";
 let isResponseWrapped = true;
 
@@ -65,11 +71,7 @@ async function analyzeCurlCommand() {
             body: JSON.stringify({
                 command,
                 responseBody: responseBodyInput.value.trim() || null,
-                assertions: assertionDrafts.map((draft) => ({
-                    field: draft.field,
-                    rule: draft.rule,
-                    value: draft.value
-                }))
+                tests: buildAnalyzePayloadTests()
             })
         });
 
@@ -92,12 +94,23 @@ async function analyzeCurlCommand() {
     }
 }
 
+function buildAnalyzePayloadTests() {
+    return testDrafts.map((draft, index) => ({
+        name: draft.name.trim() || `Test ${index + 1}`,
+        expectedStatus: normalizeExpectedStatus(draft.expectedStatus),
+        assertions: draft.assertions.map((assertion) => ({
+            field: assertion.field,
+            rule: assertion.rule,
+            value: assertion.value
+        }))
+    }));
+}
+
 function parseResponseBody() {
     const responseBody = responseBodyInput.value.trim();
     if (!responseBody) {
         parsedResponseFields = [];
         parsedResponseObject = null;
-        assertionDrafts = [];
         lastParsedResponseBody = "";
         renderAssertionBuilder();
         renderResponseStatus("No response body parsed yet.", false);
@@ -112,15 +125,17 @@ function parseResponseBody() {
     try {
         parsedResponseObject = JSON.parse(responseBody);
         parsedResponseFields = collectResponseFields(parsedResponseObject);
-        assertionDrafts = assertionDrafts.filter((draft) =>
-            parsedResponseFields.some((field) => field.path === draft.field));
+        testDrafts = testDrafts.map((draft) => ({
+            ...draft,
+            assertions: draft.assertions.filter((assertion) =>
+                parsedResponseFields.some((field) => field.path === assertion.field))
+        }));
         lastParsedResponseBody = responseBody;
         renderAssertionBuilder();
         renderResponseStatus(`${parsedResponseFields.length} selectable fields detected.`, false);
     } catch (error) {
         parsedResponseFields = [];
         parsedResponseObject = null;
-        assertionDrafts = [];
         lastParsedResponseBody = "";
         renderAssertionBuilder();
         renderResponseStatus(error.message || "Response body is not valid JSON.", true);
@@ -185,11 +200,119 @@ function collectResponseFields(value, path = "") {
 }
 
 function renderAssertionBuilder() {
+    ensureAtLeastOneTestDraft();
+    renderTestDraftList();
+    syncCurrentTestInputs();
     renderFieldOptions();
     renderRuleOptions();
     renderValueInput();
     renderAssertionDrafts();
-    addAssertionButton.disabled = parsedResponseFields.length === 0;
+    addAssertionButton.disabled = parsedResponseFields.length === 0 || !getCurrentTestDraft();
+}
+
+function ensureAtLeastOneTestDraft() {
+    if (testDrafts.length === 0) {
+        const initialDraft = createTestDraft();
+        testDrafts.push(initialDraft);
+        currentTestDraftId = initialDraft.id;
+        return;
+    }
+
+    if (!testDrafts.some((draft) => draft.id === currentTestDraftId)) {
+        currentTestDraftId = testDrafts[0].id;
+    }
+}
+
+function createTestDraft() {
+    const testNumber = nextTestDraftNumber++;
+    return {
+        id: `test-${Date.now()}-${testNumber}`,
+        name: `Test ${testNumber}`,
+        expectedStatus: 200,
+        assertions: []
+    };
+}
+
+function getCurrentTestDraft() {
+    return testDrafts.find((draft) => draft.id === currentTestDraftId) ?? null;
+}
+
+function renderTestDraftList() {
+    testDraftList.innerHTML = "";
+
+    if (testDrafts.length === 0) {
+        testDraftList.innerHTML = "<p class=\"result-note\">No tests drafted yet.</p>";
+        return;
+    }
+
+    testDrafts.forEach((draft, index) => {
+        const item = document.createElement("div");
+        item.className = "test-draft-item";
+
+        const info = document.createElement("div");
+        info.className = "test-draft-info";
+
+        const title = document.createElement("strong");
+        title.textContent = draft.name.trim() || `Test ${index + 1}`;
+
+        const meta = document.createElement("span");
+        meta.className = "test-draft-meta";
+        meta.textContent = `Expected ${normalizeExpectedStatus(draft.expectedStatus)} | ${draft.assertions.length} assertions`;
+
+        info.appendChild(title);
+        info.appendChild(meta);
+
+        const actions = document.createElement("div");
+        actions.className = "test-draft-actions";
+
+        const editButton = document.createElement("button");
+        editButton.type = "button";
+        editButton.className = `ghost-button inline-button${draft.id === currentTestDraftId ? " is-active" : ""}`;
+        editButton.textContent = draft.id === currentTestDraftId ? "Editing" : "Edit";
+        editButton.addEventListener("click", () => {
+            currentTestDraftId = draft.id;
+            renderAssertionBuilder();
+        });
+
+        const removeButton = document.createElement("button");
+        removeButton.type = "button";
+        removeButton.className = "ghost-button inline-button";
+        removeButton.textContent = "Remove";
+        removeButton.addEventListener("click", () => removeTestDraft(draft.id));
+
+        actions.appendChild(editButton);
+        actions.appendChild(removeButton);
+
+        item.appendChild(info);
+        item.appendChild(actions);
+        testDraftList.appendChild(item);
+    });
+}
+
+function removeTestDraft(testId) {
+    testDrafts = testDrafts.filter((draft) => draft.id !== testId);
+
+    if (testDrafts.length === 0) {
+        const replacementDraft = createTestDraft();
+        testDrafts = [replacementDraft];
+        currentTestDraftId = replacementDraft.id;
+    } else if (currentTestDraftId === testId) {
+        currentTestDraftId = testDrafts[0].id;
+    }
+
+    renderAssertionBuilder();
+}
+
+function syncCurrentTestInputs() {
+    const currentDraft = getCurrentTestDraft();
+    if (!currentDraft) {
+        testNameInput.value = "";
+        expectedStatusInput.value = "200";
+        return;
+    }
+
+    testNameInput.value = currentDraft.name;
+    expectedStatusInput.value = String(normalizeExpectedStatus(currentDraft.expectedStatus));
 }
 
 function renderFieldOptions() {
@@ -282,7 +405,7 @@ function renderValueInput() {
 
     if (definition.valueMode === "number") {
         input.type = "number";
-        input.step = "1";
+        input.step = "any";
         input.value = Array.isArray(field.sample) ? String(field.sample.length) : "1";
     } else {
         input.type = "text";
@@ -328,10 +451,11 @@ function getRulesForFieldType(fieldType) {
 }
 
 function addAssertionDraft() {
+    const currentDraft = getCurrentTestDraft();
     const field = getSelectedField();
     const rule = assertionRuleSelect.value;
 
-    if (!field || !rule) {
+    if (!currentDraft || !field || !rule) {
         renderResponseStatus("Parse a response body and choose a field first.", true);
         return;
     }
@@ -339,13 +463,14 @@ function addAssertionDraft() {
     const valueInput = document.getElementById("assertionValueInput");
     const value = convertAssertionValue(rule, field.type, valueInput);
 
-    assertionDrafts.push({
+    currentDraft.assertions.push({
         field: field.path,
         rule,
         value
     });
 
     renderAssertionDrafts();
+    renderTestDraftList();
 }
 
 function convertAssertionValue(rule, fieldType, input) {
@@ -360,7 +485,7 @@ function convertAssertionValue(rule, fieldType, input) {
     }
 
     if (definition.valueMode === "number") {
-        return Number.parseInt(input.value, 10);
+        return Number(input.value);
     }
 
     if (definition.valueMode === "text") {
@@ -388,13 +513,14 @@ function convertAssertionValue(rule, fieldType, input) {
 
 function renderAssertionDrafts() {
     assertionList.innerHTML = "";
+    const currentDraft = getCurrentTestDraft();
 
-    if (assertionDrafts.length === 0) {
-        assertionList.innerHTML = "<p class=\"result-note\">No assertion rules added yet.</p>";
+    if (!currentDraft || currentDraft.assertions.length === 0) {
+        assertionList.innerHTML = "<p class=\"result-note\">No assertion rules added for this test yet.</p>";
         return;
     }
 
-    assertionDrafts.forEach((draft, index) => {
+    currentDraft.assertions.forEach((draft, index) => {
         const item = document.createElement("div");
         item.className = "assertion-draft-item";
 
@@ -406,8 +532,9 @@ function renderAssertionDrafts() {
         removeButton.className = "ghost-button inline-button";
         removeButton.textContent = "Remove";
         removeButton.addEventListener("click", () => {
-            assertionDrafts.splice(index, 1);
+            currentDraft.assertions.splice(index, 1);
             renderAssertionDrafts();
+            renderTestDraftList();
         });
 
         item.appendChild(text);
@@ -492,7 +619,7 @@ function renderEnvironmentCard(environment) {
 }
 
 function renderEndpointCard(endpoint) {
-    const { card, body } = createCard("Endpoint scan", "Checks whether the endpoint already exists, then generates endpoint YAML including any assertion rules you added.");
+    const { card, body } = createCard("Endpoint scan", "Checks whether the endpoint already exists, then generates endpoint YAML including every drafted test and its assertions.");
     body.appendChild(createBadgeRow(endpoint.exists, endpoint.exists ? "Endpoint found" : "Endpoint missing"));
 
     const details = document.createElement("dl");
@@ -659,7 +786,10 @@ function renderResponseStatus(message, isError) {
 
 function setBusy(isBusy) {
     analyzeButton.disabled = isBusy;
-    addAssertionButton.disabled = isBusy || parsedResponseFields.length === 0;
+    addAssertionButton.disabled = isBusy || parsedResponseFields.length === 0 || !getCurrentTestDraft();
+    addTestButton.disabled = isBusy;
+    testNameInput.disabled = isBusy;
+    expectedStatusInput.disabled = isBusy;
     formatResponseButton.disabled = isBusy;
     toggleResponseWrapButton.disabled = isBusy;
     analyzeButton.innerHTML = isBusy
@@ -691,12 +821,49 @@ function escapeHtml(value) {
         .replaceAll(">", "&gt;");
 }
 
+function normalizeExpectedStatus(value) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) || parsed <= 0 ? 200 : parsed;
+}
+
+function updateCurrentTestDraft(mutator) {
+    const currentDraft = getCurrentTestDraft();
+    if (!currentDraft) {
+        return;
+    }
+
+    mutator(currentDraft);
+    renderTestDraftList();
+}
+
 assertionFieldSelect.addEventListener("change", () => {
     renderRuleOptions();
     renderValueInput();
 });
+
 assertionRuleSelect.addEventListener("change", renderValueInput);
+
 addAssertionButton.addEventListener("click", addAssertionDraft);
+
+addTestButton.addEventListener("click", () => {
+    const newDraft = createTestDraft();
+    testDrafts.push(newDraft);
+    currentTestDraftId = newDraft.id;
+    renderAssertionBuilder();
+});
+
+testNameInput.addEventListener("input", () => {
+    updateCurrentTestDraft((draft) => {
+        draft.name = testNameInput.value;
+    });
+});
+
+expectedStatusInput.addEventListener("input", () => {
+    updateCurrentTestDraft((draft) => {
+        draft.expectedStatus = normalizeExpectedStatus(expectedStatusInput.value);
+    });
+});
+
 analyzeButton.addEventListener("click", analyzeCurlCommand);
 formatResponseButton.addEventListener("click", formatResponseBody);
 toggleResponseWrapButton.addEventListener("click", toggleResponseWrap);

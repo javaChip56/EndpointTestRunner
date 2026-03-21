@@ -906,6 +906,40 @@ body.app-shell {
     gap: 0.6rem;
 }
 
+.test-draft-list {
+    margin-top: 0.9rem;
+    display: grid;
+    gap: 0.6rem;
+}
+
+.test-draft-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.9rem;
+    align-items: center;
+    padding: 0.8rem 0.9rem;
+    border-radius: 0.9rem;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.test-draft-info {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.test-draft-meta {
+    color: #667085;
+    font-size: 0.85rem;
+}
+
+.test-draft-actions {
+    display: flex;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
 .assertion-draft-item {
     display: flex;
     justify-content: space-between;
@@ -988,6 +1022,15 @@ body.app-shell {
 
     .assertion-draft-item {
         flex-direction: column;
+        align-items: stretch;
+    }
+
+    .test-draft-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .test-draft-actions {
         align-items: stretch;
     }
 }

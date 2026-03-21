@@ -6,6 +6,8 @@ public sealed class CurlAnalyzeRequest
 
     public string? ResponseBody { get; init; }
 
+    public IReadOnlyList<CurlTestDraft> Tests { get; init; } = [];
+
     public IReadOnlyList<CurlAssertionDraft> Assertions { get; init; } = [];
 }
 
@@ -50,6 +52,15 @@ public sealed class CurlAssertionDraft
     public string Rule { get; init; } = string.Empty;
 
     public object? Value { get; init; }
+}
+
+public sealed class CurlTestDraft
+{
+    public string Name { get; init; } = string.Empty;
+
+    public int ExpectedStatus { get; init; } = 200;
+
+    public IReadOnlyList<CurlAssertionDraft> Assertions { get; init; } = [];
 }
 
 public sealed class CurlEnvironmentAnalysis

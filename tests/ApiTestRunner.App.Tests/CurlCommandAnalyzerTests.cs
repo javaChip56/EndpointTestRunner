@@ -151,6 +151,57 @@ public sealed class CurlCommandAnalyzerTests
     }
 
     [Fact]
+    public async Task AnalyzeAsync_GeneratesMultipleTestsWithSeparateAssertions()
+    {
+        var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
+        {
+            Environments = []
+        }));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            Command = "curl --request POST \"https://api.partner.com/AccountHoldingsMgmt/GetAccountList\"",
+            Tests =
+            [
+                new CurlTestDraft
+                {
+                    Name = "Account list should return data",
+                    ExpectedStatus = 200,
+                    Assertions =
+                    [
+                        new CurlAssertionDraft
+                        {
+                            Field = "statusCode",
+                            Rule = "equals",
+                            Value = 1
+                        }
+                    ]
+                },
+                new CurlTestDraft
+                {
+                    Name = "Account list should include rows",
+                    ExpectedStatus = 200,
+                    Assertions =
+                    [
+                        new CurlAssertionDraft
+                        {
+                            Field = "data.pagenationTemplate.dataLists",
+                            Rule = "minCount",
+                            Value = 1
+                        }
+                    ]
+                }
+            ]
+        });
+
+        Assert.NotNull(result.Endpoint.SuggestedYaml);
+        Assert.Contains("- name: \"Account list should return data\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("- name: \"Account list should include rows\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("field: \"statusCode\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("field: \"data.pagenationTemplate.dataLists\"", result.Endpoint.SuggestedYaml);
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_ReturnsWarningsAndSuggestionsWhenYamlFilesAreMissing()
     {
         var analyzer = new CurlCommandAnalyzer(new ThrowingConfiguredTestSuiteProvider(
