@@ -157,7 +157,7 @@ function renderSelection(manifest) {
         const visibleEnvironmentTestIds = endpoints.flatMap((endpointEntry) => endpointEntry.tests.map((test) => test.id));
 
         const environmentNode = document.createElement("details");
-        environmentNode.className = "selection-group";
+        environmentNode.className = "card card-outline card-success selection-group";
         environmentNode.open = selectionSearchTerm ? true : selectionExpansionState.environments.get(environment.id) ?? true;
         environmentNode.addEventListener("toggle", () => {
             selectionExpansionState.environments.set(environment.id, environmentNode.open);
@@ -175,14 +175,14 @@ function renderSelection(manifest) {
         ));
 
         const environmentBody = document.createElement("div");
-        environmentBody.className = "selection-group-body";
+        environmentBody.className = "card-body selection-group-body";
 
         for (const endpointEntry of endpoints) {
             const { endpoint, endpointMatches, tests } = endpointEntry;
             const endpointIds = tests.map((test) => test.id);
 
             const endpointNode = document.createElement("details");
-            endpointNode.className = "selection-subgroup";
+            endpointNode.className = "card card-outline card-success selection-subgroup";
             endpointNode.open = selectionSearchTerm ? true : selectionExpansionState.endpoints.get(endpoint.id) ?? false;
             endpointNode.addEventListener("toggle", () => {
                 selectionExpansionState.endpoints.set(endpoint.id, endpointNode.open);
@@ -205,14 +205,15 @@ function renderSelection(manifest) {
             ));
 
             const testList = document.createElement("div");
-            testList.className = "selection-test-list";
+            testList.className = "list-group selection-test-list";
 
             for (const test of tests) {
                 const testRow = document.createElement("label");
-                testRow.className = "selection-test";
+                testRow.className = "list-group-item selection-test";
 
                 const checkbox = document.createElement("input");
                 checkbox.type = "checkbox";
+                checkbox.className = "form-check-input";
                 checkbox.checked = selectedTestIds.has(test.id);
                 checkbox.addEventListener("change", () => toggleTestSelection(test.id, checkbox.checked));
 
@@ -242,6 +243,7 @@ function createSelectionHeader(titleHtml, detailHtml, childTestIds, onToggle, ac
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
+    checkbox.className = "form-check-input";
     checkbox.checked = childTestIds.length > 0 && childTestIds.every((testId) => selectedTestIds.has(testId));
     checkbox.indeterminate = !checkbox.checked && childTestIds.some((testId) => selectedTestIds.has(testId));
     checkbox.addEventListener("click", (event) => {
@@ -259,7 +261,7 @@ function createSelectionHeader(titleHtml, detailHtml, childTestIds, onToggle, ac
     if (action) {
         const actionButton = document.createElement("button");
         actionButton.type = "button";
-        actionButton.className = "ghost-button inline-button selection-action-button";
+        actionButton.className = "btn btn-outline-primary btn-sm selection-action-button";
         actionButton.innerHTML = `<i class="${action.iconClass} button-icon"></i>${action.label}`;
         actionButton.addEventListener("click", (event) => {
             event.preventDefault();
@@ -454,7 +456,7 @@ function renderState(state) {
         const environmentBadge = environmentNode.querySelector(".environment-badge");
         const environmentIsPassing = (resultsSearchTerm || resultsStatusFilter !== "all") ? visibleFailedTests === 0 : environment.failedTests === 0;
         environmentBadge.textContent = environmentIsPassing ? "Passing" : "Issues";
-        environmentBadge.className = `environment-badge ${environmentIsPassing ? "passing" : "failing"}`;
+        environmentBadge.className = buildStatusBadgeClass("environment-badge", environmentIsPassing);
 
         const endpointList = environmentNode.querySelector(".endpoint-list");
 
@@ -475,7 +477,7 @@ function renderState(state) {
             const endpointVisibleFailedTests = tests.filter((test) => !test.isSuccess).length;
             const endpointIsPassing = (resultsSearchTerm || resultsStatusFilter !== "all") ? endpointVisibleFailedTests === 0 : endpoint.isSuccess;
             endpointBadge.textContent = endpointIsPassing ? "Pass" : "Fail";
-            endpointBadge.className = `endpoint-badge ${endpointIsPassing ? "passing" : "failing"}`;
+            endpointBadge.className = buildStatusBadgeClass("environment-badge endpoint-badge", endpointIsPassing);
 
             initializeResponsePreview(
                 endpointNode,
@@ -496,7 +498,7 @@ function renderState(state) {
 
                 const testBadge = testNode.querySelector(".test-badge");
                 testBadge.textContent = test.isSuccess ? "Pass" : "Fail";
-                testBadge.className = `test-badge ${test.isSuccess ? "passing" : "failing"}`;
+                testBadge.className = buildStatusBadgeClass("environment-badge test-badge", test.isSuccess);
 
                 const expectedText = `Expected ${test.expectedStatus}, actual ${test.actualStatus ?? "n/a"}`;
                 const errorSuffix = test.errorMessage ? ` - ${test.errorMessage}` : "";
@@ -765,13 +767,24 @@ function updateResultButtons(isEnabled) {
 }
 
 function updateResultFilterButtons() {
-    showAllResultsButton.classList.toggle("is-active", resultsStatusFilter === "all");
-    showPassingResultsButton.classList.toggle("is-active", resultsStatusFilter === "passing");
-    showFailingResultsButton.classList.toggle("is-active", resultsStatusFilter === "failing");
+    setFilterButtonState(showAllResultsButton, resultsStatusFilter === "all", "btn-primary");
+    setFilterButtonState(showPassingResultsButton, resultsStatusFilter === "passing", "btn-success");
+    setFilterButtonState(showFailingResultsButton, resultsStatusFilter === "failing", "btn-danger");
 }
 
 function setStatusError(hasError) {
     document.getElementById("runStatus").classList.toggle("status-error", hasError);
+}
+
+function setFilterButtonState(button, isActive, activeClass) {
+    button.classList.toggle("is-active", isActive);
+    button.classList.toggle(activeClass, isActive);
+    button.classList.toggle("text-white", isActive);
+    button.classList.toggle("btn-default", !isActive);
+}
+
+function buildStatusBadgeClass(baseClassName, isPassing) {
+    return `${baseClassName} badge rounded-pill ${isPassing ? "text-bg-success" : "text-bg-danger"}`;
 }
 
 function getResultEnvironmentKey(environment) {

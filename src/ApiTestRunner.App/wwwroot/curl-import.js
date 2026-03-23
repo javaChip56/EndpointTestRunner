@@ -389,7 +389,7 @@ function renderTestDraftList() {
 
     testDrafts.forEach((draft, index) => {
         const item = document.createElement("div");
-        item.className = "test-draft-item";
+        item.className = "test-draft-item card card-outline card-light";
 
         const info = document.createElement("div");
         info.className = "test-draft-info";
@@ -409,7 +409,7 @@ function renderTestDraftList() {
 
         const editButton = document.createElement("button");
         editButton.type = "button";
-        editButton.className = `ghost-button inline-button${draft.id === currentTestDraftId ? " is-active" : ""}`;
+        editButton.className = `btn btn-sm ${draft.id === currentTestDraftId ? "btn-primary is-active" : "btn-default"}`;
         editButton.textContent = draft.id === currentTestDraftId ? "Editing" : "Edit";
         editButton.addEventListener("click", () => {
             currentTestDraftId = draft.id;
@@ -418,7 +418,7 @@ function renderTestDraftList() {
 
         const removeButton = document.createElement("button");
         removeButton.type = "button";
-        removeButton.className = "ghost-button inline-button";
+        removeButton.className = "btn btn-default btn-sm";
         removeButton.textContent = "Remove";
         removeButton.addEventListener("click", () => removeTestDraft(draft.id));
 
@@ -518,7 +518,7 @@ function renderValueInput() {
         assertionBuilderGrid.classList.remove("has-complex-value");
         assertionValueContainer.classList.remove("field-stack-wide");
         const input = document.createElement("input");
-        input.className = "tool-input-inline";
+        input.className = "form-control tool-input-inline";
         input.type = "text";
         input.disabled = true;
         assertionValueContainer.appendChild(input);
@@ -535,7 +535,7 @@ function renderValueInput() {
     if (definition.valueMode === "select") {
         const select = document.createElement("select");
         select.id = "assertionValueInput";
-        select.className = "tool-select";
+        select.className = "form-select tool-select";
 
         definition.options.forEach((optionDefinition) => {
             const option = document.createElement("option");
@@ -556,7 +556,7 @@ function renderValueInput() {
 
     const input = document.createElement("input");
     input.id = "assertionValueInput";
-    input.className = "tool-input-inline";
+    input.className = "form-control tool-input-inline";
 
     if (definition.valueMode === "number") {
         input.type = "number";
@@ -580,7 +580,7 @@ function renderContainsValueInput(field, selectedRelativeField, selectedRelative
         assertionValueContainer.appendChild(helper);
 
         const input = document.createElement("input");
-        input.className = "tool-input-inline";
+        input.className = "form-control tool-input-inline";
         input.type = "text";
         input.disabled = true;
         assertionValueContainer.appendChild(input);
@@ -599,7 +599,7 @@ function renderContainsValueInput(field, selectedRelativeField, selectedRelative
 
     const select = document.createElement("select");
     select.id = "assertionContainsFieldInput";
-    select.className = "tool-select";
+    select.className = "form-select tool-select";
 
     containsFieldOptions.forEach((optionDefinition) => {
         const option = document.createElement("option");
@@ -629,7 +629,7 @@ function renderContainsValueInput(field, selectedRelativeField, selectedRelative
 
     const ruleSelect = document.createElement("select");
     ruleSelect.id = "assertionContainsRuleInput";
-    ruleSelect.className = "tool-select";
+    ruleSelect.className = "form-select tool-select";
 
     getContainsRulesForFieldType(selectedFieldDefinition.type).forEach((rule) => {
         const option = document.createElement("option");
@@ -671,7 +671,7 @@ function createContainsValueInput(fieldDefinition, rule, previousValue) {
     if (definition.valueMode === "select") {
         const select = document.createElement("select");
         select.id = "assertionContainsValueInput";
-        select.className = "tool-select";
+        select.className = "form-select tool-select";
 
         definition.options.forEach((optionDefinition) => {
             const option = document.createElement("option");
@@ -699,7 +699,7 @@ function createContainsValueInput(fieldDefinition, rule, previousValue) {
 
     const input = document.createElement("input");
     input.id = "assertionContainsValueInput";
-    input.className = "tool-input-inline";
+    input.className = "form-control tool-input-inline";
 
     if (definition.valueMode === "number") {
         input.type = "number";
@@ -909,14 +909,15 @@ function renderAssertionDrafts() {
 
     currentDraft.assertions.forEach((draft, index) => {
         const item = document.createElement("div");
-        item.className = "assertion-draft-item";
+        item.className = "assertion-draft-item card card-outline card-light";
 
         const text = document.createElement("span");
+        text.className = "assertion-draft-text";
         text.textContent = `${draft.field} -> ${draft.rule}: ${formatSample(draft.value)}`;
 
         const removeButton = document.createElement("button");
         removeButton.type = "button";
-        removeButton.className = "ghost-button inline-button";
+        removeButton.className = "btn btn-default btn-sm";
         removeButton.textContent = "Remove";
         removeButton.addEventListener("click", () => {
             currentDraft.assertions.splice(index, 1);
@@ -947,8 +948,8 @@ function renderResult(result) {
 
 function renderWarningCard(warnings) {
     const card = document.createElement("section");
-    card.className = "preview-card warning-card";
-    card.innerHTML = "<h2>Warnings</h2><p class=\"result-note\">The analyzer continued with generated suggestions even though the configured YAML suite could not be loaded fully.</p>";
+    card.className = "preview-card card card-outline card-warning warning-card";
+    card.innerHTML = "<div class=\"card-header\"><h2 class=\"card-title\">Warnings</h2></div><div class=\"card-body\"><p class=\"result-note mb-0\">The analyzer continued with generated suggestions even though the configured YAML suite could not be loaded fully.</p></div>";
 
     const list = document.createElement("ul");
     list.className = "warning-list";
@@ -959,7 +960,7 @@ function renderWarningCard(warnings) {
         list.appendChild(item);
     });
 
-    card.appendChild(list);
+    card.querySelector(".card-body").appendChild(list);
     return card;
 }
 
@@ -1178,15 +1179,15 @@ function normalizeDiffLines(text) {
 
 function createCard(title, summary) {
     const card = document.createElement("details");
-    card.className = "preview-card collapsible-preview-card";
+    card.className = "preview-card collapsible-preview-card card card-outline card-secondary";
     card.open = true;
 
     const header = document.createElement("summary");
-    header.className = "preview-card-summary";
-    header.innerHTML = `<h2>${escapeHtml(title)}</h2><p class="result-note">${escapeHtml(summary)}</p>`;
+    header.className = "card-header preview-card-summary";
+    header.innerHTML = `<div><h2 class="card-title">${escapeHtml(title)}</h2><p class="result-note mb-0">${escapeHtml(summary)}</p></div>`;
 
     const body = document.createElement("div");
-    body.className = "preview-card-body";
+    body.className = "card-body preview-card-body";
 
     card.appendChild(header);
     card.appendChild(body);
@@ -1199,7 +1200,7 @@ function createBadgeRow(isPassing, text) {
     wrapper.className = "badge-row";
 
     const badge = document.createElement("span");
-    badge.className = `status-badge ${isPassing ? "passing" : "failing"}`;
+    badge.className = `status-badge badge rounded-pill ${isPassing ? "text-bg-success" : "text-bg-danger"}`;
     badge.textContent = text;
 
     wrapper.appendChild(badge);
@@ -1226,7 +1227,7 @@ function createCopyAction(text, label) {
 
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "ghost-button inline-button copy-button";
+    button.className = "btn btn-default btn-sm copy-button";
     button.innerHTML = "&#128203; " + escapeHtml(label);
     button.addEventListener("click", async () => {
         const originalLabel = button.innerHTML;

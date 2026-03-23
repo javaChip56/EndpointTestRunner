@@ -79,6 +79,83 @@ public sealed class DashboardEndpointEditorServiceTests : IDisposable
         Assert.Contains("equals: 1", savedYaml);
     }
 
+    [Fact]
+    public async Task SaveAsync_DecodesEncodedRoutePlaceholdersInEndpointPath()
+    {
+        var environmentFilePath = Path.Combine(_tempDirectory, "customer-environment.yaml");
+        var endpointFilePath = Path.Combine(_tempDirectory, "customer-endpoint.yaml");
+
+        File.WriteAllText(environmentFilePath, """
+            environments:
+              - name: "Local"
+                baseUrl: "https://api.example.com"
+            """);
+
+        File.WriteAllText(endpointFilePath, """
+            targetEnvironments:
+              - "Local"
+            endpoints:
+              - name: "Get Customer Details"
+                method: "GET"
+                path: "/sample-api/customers/{customerId}"
+                tests:
+                  - name: "Customer lookup should succeed"
+                    expectedStatus: 200
+            """);
+
+        var endpoint = new EndpointDefinition
+        {
+            Name = "Get Customer Details",
+            Method = "GET",
+            Path = "/sample-api/customers/{customerId}",
+            Tests =
+            [
+                new TestDefinition
+                {
+                    Name = "Customer lookup should succeed",
+                    ExpectedStatus = 200
+                }
+            ]
+        };
+
+        var environment = new EnvironmentDefinition
+        {
+            Name = "Local",
+            BaseUrl = "https://api.example.com",
+            Endpoints = [endpoint]
+        };
+
+        var provider = new StubConfiguredTestSuiteProvider(new LoadedTestSuite(
+            new ApiTestSuiteDefinition
+            {
+                Environments = [environment]
+            },
+            [environmentFilePath, endpointFilePath]));
+
+        var service = new DashboardEndpointEditorService(provider);
+
+        await service.SaveAsync(new DashboardEndpointSaveRequest
+        {
+            EnvironmentId = DashboardSuiteManifestFactory.CreateEnvironmentId(environment),
+            EndpointId = DashboardSuiteManifestFactory.CreateEndpointId(environment, endpoint),
+            EndpointName = "Get Customer Details",
+            Command = "curl --request GET \"https://api.example.com/sample-api/customers/%7BcustomerId%7D\"",
+            Tests =
+            [
+                new CurlTestDraft
+                {
+                    Name = "Customer profile should include tags",
+                    ExpectedStatus = 200
+                }
+            ]
+        });
+
+        var savedYaml = await File.ReadAllTextAsync(endpointFilePath);
+
+        Assert.Contains("path: \"/sample-api/customers/{customerId}\"", savedYaml);
+        Assert.DoesNotContain("%7BcustomerId%7D", savedYaml);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempDirectory))

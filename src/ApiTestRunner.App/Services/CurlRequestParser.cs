@@ -88,7 +88,7 @@ internal static class CurlRequestParser
             Method = (method ?? (combinedBody is null ? HttpMethod.Get.Method : HttpMethod.Post.Method)).ToUpperInvariant(),
             Url = uri.ToString(),
             BaseUrl = $"{uri.Scheme}://{uri.Authority}",
-            Path = string.IsNullOrWhiteSpace(uri.AbsolutePath) ? "/" : uri.AbsolutePath,
+            Path = GetUnescapedAbsolutePath(uri),
             Query = ParseQuery(uri),
             Headers = headers,
             Body = TryParseJsonBody(combinedBody),
@@ -338,8 +338,8 @@ internal static class CurlRequestParser
             return null;
         }
 
-        var environmentPath = NormalizePath(environmentUri.AbsolutePath);
-        var requestPath = NormalizePath(requestUri.AbsolutePath);
+        var environmentPath = NormalizePath(GetUnescapedAbsolutePath(environmentUri));
+        var requestPath = NormalizePath(GetUnescapedAbsolutePath(requestUri));
 
         if (!PathStartsWith(requestPath, environmentPath))
         {
@@ -373,6 +373,13 @@ internal static class CurlRequestParser
         }
 
         return normalized.Length > 1 ? normalized.TrimEnd('/') : normalized;
+    }
+
+    private static string GetUnescapedAbsolutePath(Uri uri)
+    {
+        return string.IsNullOrWhiteSpace(uri.AbsolutePath)
+            ? "/"
+            : Uri.UnescapeDataString(uri.AbsolutePath);
     }
 
     private static bool PathStartsWith(string requestPath, string environmentPath)

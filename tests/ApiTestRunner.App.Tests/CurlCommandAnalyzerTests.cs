@@ -145,6 +145,34 @@ public sealed class CurlCommandAnalyzerTests
     }
 
     [Fact]
+    public async Task AnalyzeAsync_DecodesEncodedRoutePlaceholdersInGeneratedYaml()
+    {
+        var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
+        {
+            Environments =
+            [
+                new EnvironmentDefinition
+                {
+                    Name = "Local",
+                    BaseUrl = "https://api.example.com"
+                }
+            ]
+        }));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            Command = "curl --request GET \"https://api.example.com/sample-api/customers/%7BcustomerId%7D\"",
+            EndpointName = "Get Customer Details"
+        });
+
+        Assert.NotNull(result.Request);
+        Assert.Equal("/sample-api/customers/{customerId}", result.Request.RelativePath);
+        Assert.NotNull(result.Endpoint.GeneratedYaml);
+        Assert.Contains("path: \"/sample-api/customers/{customerId}\"", result.Endpoint.GeneratedYaml);
+        Assert.DoesNotContain("%7BcustomerId%7D", result.Endpoint.GeneratedYaml);
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_IncludesSelectedAssertionsInGeneratedYaml()
     {
         var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
