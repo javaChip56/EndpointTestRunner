@@ -44,6 +44,19 @@ public sealed class DashboardEndpointManifest
     public IReadOnlyList<DashboardTestManifest> Tests { get; init; } = [];
 }
 
+public sealed class DashboardEndpointEditorSeed
+{
+    public string EnvironmentId { get; init; } = string.Empty;
+
+    public string EnvironmentName { get; init; } = string.Empty;
+
+    public string EndpointId { get; init; } = string.Empty;
+
+    public string CurlCommand { get; init; } = string.Empty;
+
+    public IReadOnlyList<CurlTestDraft> Tests { get; init; } = [];
+}
+
 public sealed class DashboardTestManifest
 {
     public string Id { get; init; } = string.Empty;

@@ -196,7 +196,12 @@ function renderSelection(manifest) {
                     ? `${highlightMatch(endpoint.method, selectionSearchTerm)} ${highlightMatch(endpoint.path, selectionSearchTerm)} - ${tests.length} tests`
                     : `${highlightMatch(endpoint.method, selectionSearchTerm)} ${highlightMatch(endpoint.path, selectionSearchTerm)} - ${tests.length} matching tests`,
                 endpointIds,
-                toggleGroupSelection
+                toggleGroupSelection,
+                {
+                    iconClass: "fa-solid fa-pen-to-square",
+                    label: "Edit endpoint",
+                    onClick: () => openEndpointEditor(environment.id, endpoint.id)
+                }
             ));
 
             const testList = document.createElement("div");
@@ -231,7 +236,7 @@ function renderSelection(manifest) {
     }
 }
 
-function createSelectionHeader(titleHtml, detailHtml, childTestIds, onToggle) {
+function createSelectionHeader(titleHtml, detailHtml, childTestIds, onToggle, action = null) {
     const header = document.createElement("div");
     header.className = "selection-header-row";
 
@@ -250,6 +255,20 @@ function createSelectionHeader(titleHtml, detailHtml, childTestIds, onToggle) {
 
     header.appendChild(checkbox);
     header.appendChild(labelStack);
+
+    if (action) {
+        const actionButton = document.createElement("button");
+        actionButton.type = "button";
+        actionButton.className = "ghost-button inline-button selection-action-button";
+        actionButton.innerHTML = `<i class="${action.iconClass} button-icon"></i>${action.label}`;
+        actionButton.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            action.onClick();
+        });
+        header.appendChild(actionButton);
+    }
+
     return header;
 }
 
@@ -273,6 +292,15 @@ function toggleTestSelection(testId, isChecked) {
     }
 
     renderSelection(suiteManifest);
+}
+
+function openEndpointEditor(environmentId, endpointId) {
+    const query = new URLSearchParams({
+        environmentId,
+        endpointId
+    });
+
+    window.location.href = `/curl-import.html?${query.toString()}`;
 }
 
 function getAllTestIds(manifest) {

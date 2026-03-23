@@ -96,6 +96,63 @@ async function analyzeCurlCommand() {
     }
 }
 
+async function loadEditorSeedFromQuery() {
+    const query = new URLSearchParams(window.location.search);
+    const environmentId = query.get("environmentId");
+    const endpointId = query.get("endpointId");
+
+    if (!environmentId || !endpointId) {
+        return;
+    }
+
+    setBusy(true);
+    renderStatus("Loading endpoint into editor...", false);
+
+    try {
+        const response = await fetch(`/api/dashboard/editor-seed?environmentId=${encodeURIComponent(environmentId)}&endpointId=${encodeURIComponent(endpointId)}`, {
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error(await buildErrorMessage(response, "Unable to load endpoint for editing"));
+        }
+
+        const seed = await response.json();
+        applyEditorSeed(seed);
+        renderStatus(`Loaded endpoint from ${seed.environmentName}.`, false);
+        await analyzeCurlCommand();
+    } catch (error) {
+        renderStatus(error.message || "Unable to load endpoint for editing.", true);
+    } finally {
+        setBusy(false);
+    }
+}
+
+function applyEditorSeed(seed) {
+    curlInput.value = seed.curlCommand || "";
+    responseBodyInput.value = "";
+    parsedResponseFields = [];
+    parsedResponseObject = null;
+    lastParsedResponseBody = "";
+    testDrafts = (seed.tests || []).map((test, index) => ({
+        id: `seed-test-${index + 1}-${Date.now()}`,
+        name: test.name || `Test ${index + 1}`,
+        expectedStatus: normalizeExpectedStatus(test.expectedStatus),
+        assertions: Array.isArray(test.assertions)
+            ? test.assertions.map((assertion) => ({
+                field: assertion.field,
+                rule: assertion.rule,
+                value: assertion.value
+            }))
+            : []
+    }));
+    nextTestDraftNumber = Math.max(testDrafts.length + 1, nextTestDraftNumber);
+    currentTestDraftId = testDrafts[0]?.id ?? null;
+    analysisContainer.innerHTML = "";
+    renderAssertionBuilder();
+    renderResponseStatus("Paste a response body if you want to edit assertions by field picker.", false);
+}
+
 function buildAnalyzePayloadTests() {
     return testDrafts.map((draft, index) => ({
         name: draft.name.trim() || `Test ${index + 1}`,
@@ -1117,3 +1174,4 @@ toggleResponseWrapButton.addEventListener("click", toggleResponseWrap);
 responseBodyInput.addEventListener("blur", parseResponseBody);
 
 renderAssertionBuilder();
+loadEditorSeedFromQuery();

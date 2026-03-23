@@ -549,6 +549,12 @@ body.app-shell {
     padding-right: 2.75rem;
 }
 
+.selection-action-button {
+    margin-left: auto;
+    flex: 0 0 auto;
+    min-width: fit-content;
+}
+
 .selection-summary-row .selection-header-row::after,
 .environment-summary-row::after,
 .endpoint-summary-row::after,

@@ -62,6 +62,23 @@ app.MapGet("/api/dashboard/manifest", async (TestRunCoordinator coordinator, Can
     }
 });
 
+app.MapGet("/api/dashboard/editor-seed", async (
+    string environmentId,
+    string endpointId,
+    TestRunCoordinator coordinator,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var seed = await coordinator.GetEditorSeedAsync(environmentId, endpointId, cancellationToken);
+        return Results.Ok(seed);
+    }
+    catch (Exception exception)
+    {
+        return Results.BadRequest(new { error = exception.Message });
+    }
+});
+
 app.MapPost("/api/dashboard/run", async (HttpRequest request, TestRunCoordinator coordinator, CancellationToken cancellationToken) =>
 {
     var selection = request.ContentLength > 0

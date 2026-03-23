@@ -39,6 +39,17 @@ public sealed class TestRunCoordinator
         return DashboardSuiteManifestFactory.Create(loadedSuite.Suite);
     }
 
+    public async Task<DashboardEndpointEditorSeed> GetEditorSeedAsync(
+        string environmentId,
+        string endpointId,
+        CancellationToken cancellationToken = default)
+    {
+        var loadedSuite = await _suiteProvider.LoadAsync(cancellationToken);
+        var seed = DashboardSuiteManifestFactory.CreateEditorSeed(loadedSuite.Suite, environmentId, endpointId);
+
+        return seed ?? throw new InvalidOperationException("The selected endpoint could not be found in the loaded YAML suite.");
+    }
+
     public async Task<DashboardState> ExecuteAsync(
         TestSelectionRequest? selectionRequest,
         CancellationToken cancellationToken = default)
