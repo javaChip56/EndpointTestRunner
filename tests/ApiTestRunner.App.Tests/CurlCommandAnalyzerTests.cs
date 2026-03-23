@@ -45,6 +45,8 @@ public sealed class CurlCommandAnalyzerTests
         Assert.Contains("Uat", result.Endpoint.MatchedEnvironmentNames);
         Assert.Contains(result.Environment.MatchedYamlPreviews, preview => preview.Title == "Uat" && preview.Yaml.Contains("baseUrl: \"https://api.example.com\""));
         Assert.Contains(result.Endpoint.MatchedYamlPreviews, preview => preview.Title == "Uat - Get Customer Details" && preview.Yaml.Contains("path: \"/customers/{customerId}\""));
+        Assert.NotNull(result.Endpoint.GeneratedYaml);
+        Assert.Contains("path: \"/customers/C1001\"", result.Endpoint.GeneratedYaml);
         Assert.Null(result.Endpoint.SuggestedYaml);
     }
 
@@ -109,6 +111,37 @@ public sealed class CurlCommandAnalyzerTests
         Assert.Contains("path: \"/AccountHoldingsMgmt/GetAccountList\"", result.Endpoint.SuggestedYaml);
         Assert.Contains("baseCurrency: \"{{var:baseCurrency}}\"", result.Endpoint.SuggestedYaml);
         Assert.Contains("currentPageNumber: \"{{var:currentPageNumber}}\"", result.Endpoint.SuggestedYaml);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_UsesCurrentEditorEnvironmentWhenProvided()
+    {
+        var local = new EnvironmentDefinition
+        {
+            Name = "Local",
+            BaseUrl = "https://api.example.com"
+        };
+        var localCanary = new EnvironmentDefinition
+        {
+            Name = "Local Canary",
+            BaseUrl = "https://api.example.com"
+        };
+
+        var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
+        {
+            Environments = [local, localCanary]
+        }));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            EnvironmentId = DashboardSuiteManifestFactory.CreateEnvironmentId(local),
+            Command = "curl --request GET \"https://api.example.com/accounts\"",
+            EndpointName = "Get Accounts"
+        });
+
+        Assert.NotNull(result.Endpoint.GeneratedYaml);
+        Assert.Contains("- \"Local\"", result.Endpoint.GeneratedYaml);
+        Assert.DoesNotContain("Local Canary", result.Endpoint.GeneratedYaml);
     }
 
     [Fact]

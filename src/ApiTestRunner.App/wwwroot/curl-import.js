@@ -76,6 +76,7 @@ async function analyzeCurlCommand() {
             },
             body: JSON.stringify({
                 command,
+                environmentId: editorContext?.environmentId || null,
                 endpointName: endpointNameInput.value.trim() || null,
                 responseBody: responseBodyInput.value.trim() || null,
                 tests: buildAnalyzePayloadTests()
@@ -144,6 +145,7 @@ function applyEditorSeed(seed) {
         ? {
             environmentId: seed.environmentId,
             endpointId: seed.endpointId,
+            environmentName: seed.environmentName,
             sourceFilePath: seed.sourceFilePath
         }
         : null;
@@ -1018,11 +1020,39 @@ function renderEndpointCard(endpoint) {
 
     if (endpoint.matchedYamlPreviews && endpoint.matchedYamlPreviews.length > 0) {
         body.appendChild(createYamlPreviewSection("Matched endpoint YAML", endpoint.matchedYamlPreviews, "endpoint YAML"));
-    } else if (endpoint.suggestedYaml) {
-        body.appendChild(createYamlPreviewSection("Suggested endpoint YAML", [{ title: endpoint.suggestedName, yaml: endpoint.suggestedYaml }], "endpoint YAML"));
+    }
+
+    if (endpoint.generatedYaml) {
+        body.appendChild(createYamlPreviewSection(
+            endpoint.exists ? "Updated endpoint YAML preview" : "Suggested endpoint YAML",
+            [{ title: endpoint.suggestedName, yaml: endpoint.generatedYaml }],
+            "endpoint YAML"));
+    }
+
+    const baselineYaml = selectMatchedEndpointYamlPreview(endpoint);
+    if (baselineYaml && endpoint.generatedYaml && baselineYaml.trim() !== endpoint.generatedYaml.trim()) {
+        body.appendChild(createDiffSection("Change preview", baselineYaml, endpoint.generatedYaml));
     }
 
     return card;
+}
+
+function selectMatchedEndpointYamlPreview(endpoint) {
+    if (!endpoint.matchedYamlPreviews || endpoint.matchedYamlPreviews.length === 0) {
+        return null;
+    }
+
+    if (editorContext && editorContext.environmentName) {
+        const matchingPreview = endpoint.matchedYamlPreviews.find((preview) =>
+            typeof preview.title === "string" &&
+            preview.title.startsWith(`${editorContext.environmentName} - `));
+
+        if (matchingPreview) {
+            return matchingPreview.yaml || null;
+        }
+    }
+
+    return endpoint.matchedYamlPreviews[0].yaml || null;
 }
 
 function createYamlPreviewSection(sectionTitle, previews, copyLabelSuffix) {
@@ -1054,6 +1084,96 @@ function createYamlPreviewSection(sectionTitle, previews, copyLabelSuffix) {
     });
 
     return container;
+}
+
+function createDiffSection(sectionTitle, baselineYaml, generatedYaml) {
+    const container = document.createElement("div");
+    container.className = "yaml-preview-section";
+
+    const title = document.createElement("h3");
+    title.className = "preview-subtitle";
+    title.textContent = sectionTitle;
+    container.appendChild(title);
+
+    container.appendChild(createDiffLegend());
+
+    const diffBlock = document.createElement("pre");
+    diffBlock.className = "code-block diff-block";
+
+    buildLineDiff(baselineYaml, generatedYaml).forEach((entry) => {
+        const line = document.createElement("div");
+        line.className = `diff-line diff-line-${entry.type}`;
+        line.textContent = `${entry.prefix} ${entry.text}`;
+        diffBlock.appendChild(line);
+    });
+
+    container.appendChild(diffBlock);
+    return container;
+}
+
+function createDiffLegend() {
+    const legend = document.createElement("div");
+    legend.className = "diff-legend";
+    legend.innerHTML = `
+        <span class="diff-legend-item"><span class="diff-chip diff-chip-added"></span>Added</span>
+        <span class="diff-legend-item"><span class="diff-chip diff-chip-removed"></span>Removed</span>
+        <span class="diff-legend-item"><span class="diff-chip diff-chip-unchanged"></span>Unchanged</span>
+    `;
+    return legend;
+}
+
+function buildLineDiff(beforeText, afterText) {
+    const beforeLines = normalizeDiffLines(beforeText);
+    const afterLines = normalizeDiffLines(afterText);
+    const lengths = Array.from({ length: beforeLines.length + 1 }, () =>
+        new Array(afterLines.length + 1).fill(0));
+
+    for (let i = beforeLines.length - 1; i >= 0; i -= 1) {
+        for (let j = afterLines.length - 1; j >= 0; j -= 1) {
+            lengths[i][j] = beforeLines[i] === afterLines[j]
+                ? lengths[i + 1][j + 1] + 1
+                : Math.max(lengths[i + 1][j], lengths[i][j + 1]);
+        }
+    }
+
+    const entries = [];
+    let beforeIndex = 0;
+    let afterIndex = 0;
+
+    while (beforeIndex < beforeLines.length && afterIndex < afterLines.length) {
+        if (beforeLines[beforeIndex] === afterLines[afterIndex]) {
+            entries.push({ type: "unchanged", prefix: " ", text: beforeLines[beforeIndex] });
+            beforeIndex += 1;
+            afterIndex += 1;
+            continue;
+        }
+
+        if (lengths[beforeIndex + 1][afterIndex] >= lengths[beforeIndex][afterIndex + 1]) {
+            entries.push({ type: "removed", prefix: "-", text: beforeLines[beforeIndex] });
+            beforeIndex += 1;
+        } else {
+            entries.push({ type: "added", prefix: "+", text: afterLines[afterIndex] });
+            afterIndex += 1;
+        }
+    }
+
+    while (beforeIndex < beforeLines.length) {
+        entries.push({ type: "removed", prefix: "-", text: beforeLines[beforeIndex] });
+        beforeIndex += 1;
+    }
+
+    while (afterIndex < afterLines.length) {
+        entries.push({ type: "added", prefix: "+", text: afterLines[afterIndex] });
+        afterIndex += 1;
+    }
+
+    return entries;
+}
+
+function normalizeDiffLines(text) {
+    return (text || "")
+        .replace(/\r\n/g, "\n")
+        .split("\n");
 }
 
 function createCard(title, summary) {

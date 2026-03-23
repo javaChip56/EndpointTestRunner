@@ -4,6 +4,8 @@ public sealed class CurlAnalyzeRequest
 {
     public string Command { get; init; } = string.Empty;
 
+    public string? EnvironmentId { get; init; }
+
     public string? EndpointName { get; init; }
 
     public string? ResponseBody { get; init; }
@@ -89,6 +91,8 @@ public sealed class CurlEndpointAnalysis
     public IReadOnlyList<string> MatchedEnvironmentNames { get; init; } = [];
 
     public IReadOnlyList<CurlYamlPreview> MatchedYamlPreviews { get; init; } = [];
+
+    public string? GeneratedYaml { get; init; }
 
     public string? SuggestedFilePath { get; init; }
 
