@@ -85,6 +85,12 @@
                                 </div>
                                 <div class="card-body pt-0">
                                     <textarea id="curlInput" class="tool-input" spellcheck="false" placeholder="curl --location --request POST 'https://api.example.com/accounts?customerId=C1001' --header 'Content-Type: application/json' --data '{&quot;page&quot;:1}'"></textarea>
+                                    <div class="editor-meta-grid mt-3">
+                                        <label class="field-stack">
+                                            <span>Endpoint name</span>
+                                            <input id="endpointNameInput" class="tool-input-inline" type="text" placeholder="POST GetAccountList" />
+                                        </label>
+                                    </div>
                                 </div>
                             </section>
                         </div>
@@ -169,6 +175,7 @@
                                 <div class="card-body">
                                     <div class="tool-actions">
                                         <button id="analyzeButton" class="primary-button" type="button"><i class="fa-solid fa-wand-magic-sparkles button-icon"></i>Analyze and Generate</button>
+                                        <button id="saveEndpointButton" class="ghost-button" type="button"><i class="fa-solid fa-floppy-disk button-icon"></i>Save Endpoint YAML</button>
                                         <span id="analyzeStatus" class="result-summary">Waiting for input.</span>
                                     </div>
                                 </div>

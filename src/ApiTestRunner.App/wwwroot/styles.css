@@ -906,6 +906,12 @@ body.app-shell {
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.editor-meta-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(260px, 420px);
+}
+
 .assertion-builder-grid.has-complex-value {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
 }

@@ -35,7 +35,7 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
             throw new InvalidOperationException("Provide a cURL command to analyze.");
         }
 
-        var parsedRequest = ParseCurlCommand(request.Command);
+        var parsedRequest = CurlRequestParser.Parse(request.Command);
         var warnings = new List<string>();
         var loadedSuite = await TryLoadSuiteAsync(warnings, cancellationToken);
         if (warnings.Count == 0 &&
@@ -48,7 +48,7 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
         var variableSuggestions = BuildVariableSuggestions(parsedRequest);
 
         var matchedEnvironmentInfos = loadedSuite.Suite.Environments
-            .Select(environment => TryMatchEnvironment(environment, parsedRequest.Url))
+            .Select(environment => CurlRequestParser.TryMatchEnvironment(environment, parsedRequest.Url))
             .Where(match => match is not null)
             .Select(match => match!)
             .OrderByDescending(match => NormalizeBaseUrl(match.Environment.BaseUrl).Length)
@@ -125,9 +125,12 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
                 .Where(match => string.Equals(match.RelativePath, effectivePath, StringComparison.OrdinalIgnoreCase))
                 .Select(match => match.Environment.Name)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray()
+            .ToArray()
             : [suggestedEnvironmentName];
 
+        var endpointName = string.IsNullOrWhiteSpace(request.EndpointName)
+            ? SuggestEndpointName(parsedRequest.Method, effectivePath)
+            : request.EndpointName.Trim();
         var testDrafts = NormalizeTestDrafts(request, parsedRequest.Method, effectivePath);
 
         return new CurlAnalyzeResponse
@@ -149,7 +152,7 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
             Endpoint = new CurlEndpointAnalysis
             {
                 Exists = matchedEndpointEnvironments.Length > 0,
-                SuggestedName = SuggestEndpointName(parsedRequest.Method, effectivePath),
+                SuggestedName = endpointName,
                 MatchedEnvironmentNames = matchedEndpointEnvironments,
                 MatchedYamlPreviews = matchedEndpointPreviews,
                 SuggestedFilePath = matchedEndpointEnvironments.Length > 0
@@ -160,6 +163,7 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
                     : GenerateEndpointYaml(
                         variableSuggestions.TransformedRequest,
                         effectivePath,
+                        endpointName,
                         targetEnvironmentNames,
                         testDrafts)
             },
@@ -764,6 +768,7 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
     private string GenerateEndpointYaml(
         CurlRequestSummary request,
         string endpointPath,
+        string endpointName,
         IReadOnlyList<string> targetEnvironmentNames,
         IReadOnlyList<CurlTestDraft> tests)
     {
@@ -772,7 +777,7 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
             ["targetEnvironments"] = targetEnvironmentNames,
             ["endpoints"] = new[]
             {
-                BuildEndpointDocument(request, endpointPath, tests)
+                BuildEndpointDocument(request, endpointPath, endpointName, tests)
             }
         };
 
@@ -782,11 +787,12 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
     private Dictionary<string, object?> BuildEndpointDocument(
         CurlRequestSummary request,
         string endpointPath,
+        string endpointName,
         IReadOnlyList<CurlTestDraft> tests)
     {
         var endpoint = new Dictionary<string, object?>
         {
-            ["name"] = SuggestEndpointName(request.Method, endpointPath),
+            ["name"] = endpointName,
             ["method"] = request.Method,
             ["path"] = endpointPath
         };

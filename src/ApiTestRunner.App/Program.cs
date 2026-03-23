@@ -22,6 +22,7 @@ builder.Services.AddSingleton(Options.Create(cliExecutionOptions));
 builder.Services.AddApiTestRunnerCore();
 builder.Services.AddSingleton<IConfiguredTestSuiteProvider, ConfiguredTestSuiteProvider>();
 builder.Services.AddSingleton<ICurlCommandAnalyzer, CurlCommandAnalyzer>();
+builder.Services.AddSingleton<DashboardEndpointEditorService>();
 builder.Services.AddSingleton<TestRunCoordinator>();
 builder.Services.AddSingleton<CliResultWriter>();
 if (cliExecutionOptions.Enabled)
@@ -72,6 +73,22 @@ app.MapGet("/api/dashboard/editor-seed", async (
     {
         var seed = await coordinator.GetEditorSeedAsync(environmentId, endpointId, cancellationToken);
         return Results.Ok(seed);
+    }
+    catch (Exception exception)
+    {
+        return Results.BadRequest(new { error = exception.Message });
+    }
+});
+
+app.MapPost("/api/dashboard/editor-save", async (
+    DashboardEndpointSaveRequest request,
+    TestRunCoordinator coordinator,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var response = await coordinator.SaveEditorAsync(request, cancellationToken);
+        return Results.Ok(response);
     }
     catch (Exception exception)
     {

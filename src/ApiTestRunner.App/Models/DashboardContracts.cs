@@ -52,9 +52,39 @@ public sealed class DashboardEndpointEditorSeed
 
     public string EndpointId { get; init; } = string.Empty;
 
+    public string EndpointName { get; init; } = string.Empty;
+
+    public string? SourceFilePath { get; init; }
+
     public string CurlCommand { get; init; } = string.Empty;
 
     public IReadOnlyList<CurlTestDraft> Tests { get; init; } = [];
+}
+
+public sealed class DashboardEndpointSaveRequest
+{
+    public string EnvironmentId { get; init; } = string.Empty;
+
+    public string EndpointId { get; init; } = string.Empty;
+
+    public string EndpointName { get; init; } = string.Empty;
+
+    public string Command { get; init; } = string.Empty;
+
+    public IReadOnlyList<CurlTestDraft> Tests { get; init; } = [];
+}
+
+public sealed class DashboardEndpointSaveResponse
+{
+    public string EnvironmentId { get; init; } = string.Empty;
+
+    public string EndpointId { get; init; } = string.Empty;
+
+    public string EndpointName { get; init; } = string.Empty;
+
+    public string FilePath { get; init; } = string.Empty;
+
+    public DateTimeOffset SavedAtUtc { get; init; }
 }
 
 public sealed class DashboardTestManifest

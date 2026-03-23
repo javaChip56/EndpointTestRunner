@@ -7,6 +7,7 @@ const curlInput = document.getElementById("curlInput");
 const responseBodyInput = document.getElementById("responseBodyInput");
 const formatResponseButton = document.getElementById("formatResponseButton");
 const toggleResponseWrapButton = document.getElementById("toggleResponseWrapButton");
+const endpointNameInput = document.getElementById("endpointNameInput");
 const testNameInput = document.getElementById("testNameInput");
 const expectedStatusInput = document.getElementById("expectedStatusInput");
 const testDraftList = document.getElementById("testDraftList");
@@ -16,6 +17,7 @@ const assertionRuleSelect = document.getElementById("assertionRuleSelect");
 const assertionValueContainer = document.getElementById("assertionValueContainer");
 const assertionList = document.getElementById("assertionList");
 const analysisContainer = document.getElementById("analysisContainer");
+const saveEndpointButton = document.getElementById("saveEndpointButton");
 
 const assertionRuleDefinitions = {
     equals: { label: "equals", valueMode: "typed" },
@@ -53,6 +55,8 @@ let currentTestDraftId = null;
 let nextTestDraftNumber = 1;
 let lastParsedResponseBody = "";
 let isResponseWrapped = true;
+let editorContext = null;
+let busyAction = null;
 
 async function analyzeCurlCommand() {
     const command = curlInput.value.trim();
@@ -62,7 +66,7 @@ async function analyzeCurlCommand() {
     }
 
     parseResponseBody();
-    setBusy(true);
+    setBusy(true, "analyze");
 
     try {
         const response = await fetch("/api/tools/curl/analyze", {
@@ -72,6 +76,7 @@ async function analyzeCurlCommand() {
             },
             body: JSON.stringify({
                 command,
+                endpointName: endpointNameInput.value.trim() || null,
                 responseBody: responseBodyInput.value.trim() || null,
                 tests: buildAnalyzePayloadTests()
             })
@@ -105,7 +110,7 @@ async function loadEditorSeedFromQuery() {
         return;
     }
 
-    setBusy(true);
+    setBusy(true, "load");
     renderStatus("Loading endpoint into editor...", false);
 
     try {
@@ -130,10 +135,18 @@ async function loadEditorSeedFromQuery() {
 
 function applyEditorSeed(seed) {
     curlInput.value = seed.curlCommand || "";
+    endpointNameInput.value = seed.endpointName || "";
     responseBodyInput.value = "";
     parsedResponseFields = [];
     parsedResponseObject = null;
     lastParsedResponseBody = "";
+    editorContext = seed.sourceFilePath
+        ? {
+            environmentId: seed.environmentId,
+            endpointId: seed.endpointId,
+            sourceFilePath: seed.sourceFilePath
+        }
+        : null;
     testDrafts = (seed.tests || []).map((test, index) => ({
         id: `seed-test-${index + 1}-${Date.now()}`,
         name: test.name || `Test ${index + 1}`,
@@ -151,6 +164,7 @@ function applyEditorSeed(seed) {
     analysisContainer.innerHTML = "";
     renderAssertionBuilder();
     renderResponseStatus("Paste a response body if you want to edit assertions by field picker.", false);
+    updateSaveButtonState();
 }
 
 function buildAnalyzePayloadTests() {
@@ -163,6 +177,73 @@ function buildAnalyzePayloadTests() {
             value: assertion.value
         }))
     }));
+}
+
+async function saveEditedEndpoint() {
+    if (!editorContext) {
+        renderStatus("Open an existing endpoint from the dashboard before saving.", true);
+        return;
+    }
+
+    const command = curlInput.value.trim();
+    if (!command) {
+        renderStatus("Paste a cURL command first.", true);
+        return;
+    }
+
+    if (!endpointNameInput.value.trim()) {
+        renderStatus("Provide an endpoint name before saving.", true);
+        return;
+    }
+
+    setBusy(true, "save");
+
+    try {
+        const response = await fetch("/api/dashboard/editor-save", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                environmentId: editorContext.environmentId,
+                endpointId: editorContext.endpointId,
+                endpointName: endpointNameInput.value.trim(),
+                command,
+                tests: buildAnalyzePayloadTests()
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(await buildErrorMessage(response, "Save request failed"));
+        }
+
+        const result = await response.json();
+        editorContext = {
+            environmentId: result.environmentId,
+            endpointId: result.endpointId,
+            sourceFilePath: result.filePath
+        };
+        updateEditorQueryString(result.environmentId, result.endpointId);
+        renderStatus(`Saved endpoint YAML to ${result.filePath}.`, false);
+        await analyzeCurlCommand();
+    } catch (error) {
+        renderStatus(error.message || "Unable to save the edited endpoint.", true);
+    } finally {
+        setBusy(false);
+    }
+}
+
+function updateEditorQueryString(environmentId, endpointId) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("environmentId", environmentId);
+    url.searchParams.set("endpointId", endpointId);
+    window.history.replaceState({}, "", url);
+}
+
+function updateSaveButtonState() {
+    const isEditable = Boolean(editorContext && editorContext.environmentId && editorContext.endpointId);
+    saveEndpointButton.hidden = !isEditable;
+    saveEndpointButton.disabled = !isEditable || busyAction !== null;
 }
 
 function parseResponseBody() {
@@ -1115,10 +1196,13 @@ function renderResponseStatus(message, isError) {
     responseStatus.classList.toggle("status-error", Boolean(isError));
 }
 
-function setBusy(isBusy) {
+function setBusy(isBusy, action = null) {
+    busyAction = isBusy ? action : null;
     analyzeButton.disabled = isBusy;
+    saveEndpointButton.disabled = isBusy || !editorContext;
     addAssertionButton.disabled = isBusy || parsedResponseFields.length === 0 || !getCurrentTestDraft();
     addTestButton.disabled = isBusy;
+    endpointNameInput.disabled = isBusy;
     testNameInput.disabled = isBusy;
     expectedStatusInput.disabled = isBusy;
     formatResponseButton.disabled = isBusy;
@@ -1126,6 +1210,10 @@ function setBusy(isBusy) {
     analyzeButton.innerHTML = isBusy
         ? "<i class=\"fa-solid fa-spinner fa-spin button-icon\"></i>Analyzing..."
         : "<i class=\"fa-solid fa-wand-magic-sparkles button-icon\"></i>Analyze and Generate";
+    saveEndpointButton.innerHTML = busyAction === "save"
+        ? "<i class=\"fa-solid fa-spinner fa-spin button-icon\"></i>Saving..."
+        : "<i class=\"fa-solid fa-floppy-disk button-icon\"></i>Save Endpoint YAML";
+    updateSaveButtonState();
 }
 
 async function buildErrorMessage(response, fallbackMessage) {
@@ -1196,9 +1284,11 @@ expectedStatusInput.addEventListener("input", () => {
 });
 
 analyzeButton.addEventListener("click", analyzeCurlCommand);
+saveEndpointButton.addEventListener("click", saveEditedEndpoint);
 formatResponseButton.addEventListener("click", formatResponseBody);
 toggleResponseWrapButton.addEventListener("click", toggleResponseWrap);
 responseBodyInput.addEventListener("blur", parseResponseBody);
 
 renderAssertionBuilder();
+updateSaveButtonState();
 loadEditorSeedFromQuery();

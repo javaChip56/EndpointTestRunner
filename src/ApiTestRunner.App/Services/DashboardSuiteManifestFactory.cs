@@ -133,6 +133,7 @@ public static class DashboardSuiteManifestFactory
                     EnvironmentId = environmentId,
                     EnvironmentName = environment.Name,
                     EndpointId = endpointId,
+                    EndpointName = endpoint.Name,
                     CurlCommand = BuildCurlCommand(environment, endpoint),
                     Tests = endpoint.Tests
                         .Select(CreateCurlTestDraft)

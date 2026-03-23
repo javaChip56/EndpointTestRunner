@@ -4,6 +4,8 @@ public sealed class CurlAnalyzeRequest
 {
     public string Command { get; init; } = string.Empty;
 
+    public string? EndpointName { get; init; }
+
     public string? ResponseBody { get; init; }
 
     public IReadOnlyList<CurlTestDraft> Tests { get; init; } = [];
