@@ -911,12 +911,10 @@ function renderEnvironmentCard(environment) {
 
     body.appendChild(details);
 
-    if (environment.suggestedYaml) {
-        body.appendChild(createCopyAction(environment.suggestedYaml, "Copy environment YAML"));
-        const preview = document.createElement("pre");
-        preview.className = "code-block";
-        preview.textContent = environment.suggestedYaml;
-        body.appendChild(preview);
+    if (environment.matchedYamlPreviews && environment.matchedYamlPreviews.length > 0) {
+        body.appendChild(createYamlPreviewSection("Matched environment YAML", environment.matchedYamlPreviews, "environment YAML"));
+    } else if (environment.suggestedYaml) {
+        body.appendChild(createYamlPreviewSection("Suggested environment YAML", [{ title: environment.suggestedName, yaml: environment.suggestedYaml }], "environment YAML"));
     }
 
     return card;
@@ -937,15 +935,44 @@ function renderEndpointCard(endpoint) {
 
     body.appendChild(details);
 
-    if (endpoint.suggestedYaml) {
-        body.appendChild(createCopyAction(endpoint.suggestedYaml, "Copy endpoint YAML"));
-        const preview = document.createElement("pre");
-        preview.className = "code-block";
-        preview.textContent = endpoint.suggestedYaml;
-        body.appendChild(preview);
+    if (endpoint.matchedYamlPreviews && endpoint.matchedYamlPreviews.length > 0) {
+        body.appendChild(createYamlPreviewSection("Matched endpoint YAML", endpoint.matchedYamlPreviews, "endpoint YAML"));
+    } else if (endpoint.suggestedYaml) {
+        body.appendChild(createYamlPreviewSection("Suggested endpoint YAML", [{ title: endpoint.suggestedName, yaml: endpoint.suggestedYaml }], "endpoint YAML"));
     }
 
     return card;
+}
+
+function createYamlPreviewSection(sectionTitle, previews, copyLabelSuffix) {
+    const container = document.createElement("div");
+    container.className = "yaml-preview-section";
+
+    const title = document.createElement("h3");
+    title.className = "preview-subtitle";
+    title.textContent = sectionTitle;
+    container.appendChild(title);
+
+    previews.forEach((previewDefinition, index) => {
+        const titleText = previewDefinition.title || `${sectionTitle} ${index + 1}`;
+        const normalizedYaml = previewDefinition.yaml || "";
+
+        if (previews.length > 1) {
+            const itemTitle = document.createElement("h4");
+            itemTitle.className = "preview-mini-title";
+            itemTitle.textContent = titleText;
+            container.appendChild(itemTitle);
+        }
+
+        container.appendChild(createCopyAction(normalizedYaml, `Copy ${titleText} ${copyLabelSuffix}`));
+
+        const preview = document.createElement("pre");
+        preview.className = "code-block";
+        preview.textContent = normalizedYaml;
+        container.appendChild(preview);
+    });
+
+    return container;
 }
 
 function createCard(title, summary) {

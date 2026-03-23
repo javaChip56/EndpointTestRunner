@@ -43,6 +43,8 @@ public sealed class CurlCommandAnalyzerTests
         Assert.True(result.Environment.Exists);
         Assert.True(result.Endpoint.Exists);
         Assert.Contains("Uat", result.Endpoint.MatchedEnvironmentNames);
+        Assert.Contains(result.Environment.MatchedYamlPreviews, preview => preview.Title == "Uat" && preview.Yaml.Contains("baseUrl: \"https://api.example.com\""));
+        Assert.Contains(result.Endpoint.MatchedYamlPreviews, preview => preview.Title == "Uat - Get Customer Details" && preview.Yaml.Contains("path: \"/customers/{customerId}\""));
         Assert.Null(result.Endpoint.SuggestedYaml);
     }
 
@@ -68,6 +70,7 @@ public sealed class CurlCommandAnalyzerTests
 
         Assert.True(result.Environment.Exists);
         Assert.Contains("PartnerUat", result.Environment.MatchedEnvironmentNames);
+        Assert.Contains(result.Environment.MatchedYamlPreviews, preview => preview.Title == "PartnerUat" && preview.Yaml.Contains("baseUrl: \"https://api.partner.com/AccountHoldingsMgmt\""));
         Assert.Null(result.Environment.SuggestedYaml);
         Assert.Equal("/GetAccountList", result.Request?.RelativePath);
     }

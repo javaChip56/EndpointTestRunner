@@ -1002,6 +1002,24 @@ body.app-shell {
     margin: 0.85rem 0 0.65rem;
 }
 
+.yaml-preview-section + .yaml-preview-section {
+    margin-top: 1rem;
+}
+
+.preview-subtitle {
+    margin: 1rem 0 0.35rem;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #344054;
+}
+
+.preview-mini-title {
+    margin: 0.85rem 0 0.2rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #667085;
+}
+
 .warning-card {
     border-color: rgba(181, 71, 8, 0.18);
     background: linear-gradient(180deg, rgba(255, 247, 237, 0.95), rgba(255, 255, 255, 0.88));

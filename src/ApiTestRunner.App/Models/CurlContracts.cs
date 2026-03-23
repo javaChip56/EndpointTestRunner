@@ -71,6 +71,8 @@ public sealed class CurlEnvironmentAnalysis
 
     public IReadOnlyList<string> MatchedEnvironmentNames { get; init; } = [];
 
+    public IReadOnlyList<CurlYamlPreview> MatchedYamlPreviews { get; init; } = [];
+
     public string? SuggestedFilePath { get; init; }
 
     public string? SuggestedYaml { get; init; }
@@ -84,9 +86,18 @@ public sealed class CurlEndpointAnalysis
 
     public IReadOnlyList<string> MatchedEnvironmentNames { get; init; } = [];
 
+    public IReadOnlyList<CurlYamlPreview> MatchedYamlPreviews { get; init; } = [];
+
     public string? SuggestedFilePath { get; init; }
 
     public string? SuggestedYaml { get; init; }
+}
+
+public sealed class CurlYamlPreview
+{
+    public string Title { get; init; } = string.Empty;
+
+    public string Yaml { get; init; } = string.Empty;
 }
 
 public sealed class CurlVariableAnalysis

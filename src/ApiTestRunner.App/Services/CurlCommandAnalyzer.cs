@@ -60,6 +60,20 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
             .DistinctBy(environment => environment.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
+        var matchedEnvironmentPreviews = matchedEnvironments
+            .Select(environment => new CurlYamlPreview
+            {
+                Title = environment.Name,
+                Yaml = SerializeYaml(new Dictionary<string, object?>
+                {
+                    ["environments"] = new object?[]
+                    {
+                        BuildEnvironmentDocument(environment)
+                    }
+                })
+            })
+            .ToArray();
+
         var effectivePath = matchedEnvironmentInfos.FirstOrDefault()?.RelativePath ?? parsedRequest.Path;
         var requestSummary = new CurlRequestSummary
         {
@@ -74,15 +88,32 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
             RawBody = parsedRequest.RawBody
         };
 
-        var matchedEndpointInfos = matchedEnvironmentInfos
-            .Where(match => match.Environment.Endpoints.Any(endpoint =>
-                MethodsMatch(endpoint.Method, parsedRequest.Method) &&
-                PathsMatch(endpoint.Path, match.RelativePath)))
+        var matchedEndpointMatches = matchedEnvironmentInfos
+            .SelectMany(match => match.Environment.Endpoints
+                .Where(endpoint =>
+                    MethodsMatch(endpoint.Method, parsedRequest.Method) &&
+                    PathsMatch(endpoint.Path, match.RelativePath))
+                .Select(endpoint => new EndpointMatch(match.Environment, endpoint)))
             .ToArray();
 
-        var matchedEndpointEnvironments = matchedEndpointInfos
+        var matchedEndpointEnvironments = matchedEndpointMatches
             .Select(match => match.Environment.Name)
             .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var matchedEndpointPreviews = matchedEndpointMatches
+            .Select(match => new CurlYamlPreview
+            {
+                Title = $"{match.Environment.Name} - {match.Endpoint.Name}",
+                Yaml = SerializeYaml(new Dictionary<string, object?>
+                {
+                    ["targetEnvironments"] = new[] { match.Environment.Name },
+                    ["endpoints"] = new object?[]
+                    {
+                        BuildEndpointDocument(match.Endpoint)
+                    }
+                })
+            })
             .ToArray();
 
         var suggestedEnvironmentName = matchedEnvironments.Length > 0
@@ -107,6 +138,7 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
                 Exists = matchedEnvironments.Length > 0,
                 SuggestedName = suggestedEnvironmentName,
                 MatchedEnvironmentNames = matchedEnvironments.Select(environment => environment.Name).ToArray(),
+                MatchedYamlPreviews = matchedEnvironmentPreviews,
                 SuggestedFilePath = matchedEnvironments.Length > 0
                     ? null
                     : BuildEnvironmentFilePath(suggestedEnvironmentName),
@@ -119,6 +151,7 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
                 Exists = matchedEndpointEnvironments.Length > 0,
                 SuggestedName = SuggestEndpointName(parsedRequest.Method, effectivePath),
                 MatchedEnvironmentNames = matchedEndpointEnvironments,
+                MatchedYamlPreviews = matchedEndpointPreviews,
                 SuggestedFilePath = matchedEndpointEnvironments.Length > 0
                     ? null
                     : BuildEndpointFilePath(parsedRequest.Method, effectivePath),
@@ -708,14 +741,12 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
         {
             ["environments"] = new object?[]
             {
-                new Dictionary<string, object?>
+                BuildEnvironmentDocument(new EnvironmentDefinition
                 {
-                    ["name"] = environmentName,
-                    ["baseUrl"] = baseUrl,
-                    ["variables"] = variables.Count == 0
-                        ? null
-                        : new Dictionary<string, object?>(variables, StringComparer.OrdinalIgnoreCase)
-                }
+                    Name = environmentName,
+                    BaseUrl = baseUrl,
+                    Variables = new Dictionary<string, object?>(variables, StringComparer.OrdinalIgnoreCase)
+                })
             }
         };
 
@@ -780,6 +811,58 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
 
         endpoint["tests"] = BuildTestDocuments(request.Method, endpointPath, tests);
         return endpoint;
+    }
+
+    private static Dictionary<string, object?> BuildEnvironmentDocument(EnvironmentDefinition environment)
+    {
+        return new Dictionary<string, object?>
+        {
+            ["name"] = environment.Name,
+            ["baseUrl"] = environment.BaseUrl,
+            ["variables"] = environment.Variables.Count == 0
+                ? null
+                : new Dictionary<string, object?>(environment.Variables, StringComparer.OrdinalIgnoreCase)
+        };
+    }
+
+    private static Dictionary<string, object?> BuildEndpointDocument(EndpointDefinition endpoint)
+    {
+        var document = new Dictionary<string, object?>
+        {
+            ["name"] = endpoint.Name,
+            ["method"] = endpoint.Method,
+            ["path"] = endpoint.Path
+        };
+
+        if (endpoint.PathParams.Count > 0)
+        {
+            document["pathParams"] = new Dictionary<string, object?>(endpoint.PathParams, StringComparer.OrdinalIgnoreCase);
+        }
+
+        if (endpoint.Query.Count > 0)
+        {
+            document["query"] = new Dictionary<string, object?>(endpoint.Query, StringComparer.OrdinalIgnoreCase);
+        }
+
+        if (endpoint.Headers.Count > 0)
+        {
+            document["headers"] = endpoint.Headers.ToDictionary(
+                pair => pair.Key,
+                pair => (object?)pair.Value,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        if (endpoint.Body is not null)
+        {
+            document["body"] = endpoint.Body;
+        }
+
+        if (endpoint.Tests.Count > 0)
+        {
+            document["tests"] = endpoint.Tests.Select(BuildTestDocument).ToList();
+        }
+
+        return document;
     }
 
     private static List<Dictionary<string, object?>> BuildTestDocuments(
@@ -849,6 +932,67 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
         }
 
         return documents;
+    }
+
+    private static Dictionary<string, object?> BuildTestDocument(TestDefinition test)
+    {
+        var document = new Dictionary<string, object?>
+        {
+            ["name"] = test.Name,
+            ["expectedStatus"] = test.ExpectedStatus
+        };
+
+        if (test.Assertions.Count > 0)
+        {
+            document["assertions"] = test.Assertions
+                .Select(BuildAssertionDocument)
+                .ToList();
+        }
+
+        return document;
+    }
+
+    private static Dictionary<string, object?> BuildAssertionDocument(AssertionDefinition assertion)
+    {
+        var document = new Dictionary<string, object?>
+        {
+            ["field"] = assertion.Field
+        };
+
+        AddAssertionValue(document, "equals", assertion.EqualsValue);
+        AddAssertionValue(document, "notEquals", assertion.NotEquals);
+        AddAssertionValue(document, "type", assertion.Type);
+        AddAssertionValue(document, "containsText", assertion.ContainsText);
+        AddAssertionValue(document, "startsWith", assertion.StartsWith);
+        AddAssertionValue(document, "endsWith", assertion.EndsWith);
+        AddAssertionValue(document, "notEmpty", assertion.NotEmpty);
+        AddAssertionValue(document, "minCount", assertion.MinCount);
+        AddAssertionValue(document, "maxCount", assertion.MaxCount);
+        AddAssertionValue(document, "count", assertion.Count);
+        AddAssertionValue(document, "greaterThan", assertion.GreaterThan);
+        AddAssertionValue(document, "greaterThanOrEqual", assertion.GreaterThanOrEqual);
+        AddAssertionValue(document, "lessThan", assertion.LessThan);
+        AddAssertionValue(document, "lessThanOrEqual", assertion.LessThanOrEqual);
+
+        if (assertion.Contains.Count > 0)
+        {
+            document["contains"] = new Dictionary<string, object?>(assertion.Contains, StringComparer.OrdinalIgnoreCase);
+        }
+
+        return document;
+    }
+
+    private static void AddAssertionValue(
+        IDictionary<string, object?> document,
+        string key,
+        object? value)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        document[key] = value;
     }
 
     private static IReadOnlyList<CurlTestDraft> NormalizeTestDrafts(
@@ -1125,6 +1269,8 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
     }
 
     private sealed record EnvironmentMatch(EnvironmentDefinition Environment, string RelativePath);
+
+    private sealed record EndpointMatch(EnvironmentDefinition Environment, EndpointDefinition Endpoint);
 
     private sealed record VariableSuggestionResult(
         IReadOnlyDictionary<string, object?> Variables,
