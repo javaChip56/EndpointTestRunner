@@ -42,12 +42,21 @@ public sealed class CurlCommandAnalyzerTests
         Assert.NotNull(result.Request);
         Assert.True(result.Environment.Exists);
         Assert.True(result.Endpoint.Exists);
+        Assert.Equal("matched", result.Environment.MatchStatus);
+        Assert.Equal("matched", result.Endpoint.MatchStatus);
         Assert.Contains("Uat", result.Endpoint.MatchedEnvironmentNames);
-        Assert.Contains(result.Environment.MatchedYamlPreviews, preview => preview.Title == "Uat" && preview.Yaml.Contains("baseUrl: \"https://api.example.com\""));
-        Assert.Contains(result.Endpoint.MatchedYamlPreviews, preview => preview.Title == "Uat - Get Customer Details" && preview.Yaml.Contains("path: \"/customers/{customerId}\""));
-        Assert.NotNull(result.Endpoint.GeneratedYaml);
-        Assert.Contains("path: \"/customers/C1001\"", result.Endpoint.GeneratedYaml);
-        Assert.Null(result.Endpoint.SuggestedYaml);
+        Assert.NotNull(result.Environment.CurrentYaml);
+        Assert.NotNull(result.Environment.SuggestedYaml);
+        Assert.NotNull(result.Environment.DiffYaml);
+        Assert.NotNull(result.Endpoint.CurrentYaml);
+        Assert.NotNull(result.Endpoint.SuggestedYaml);
+        Assert.NotNull(result.Endpoint.DiffYaml);
+        Assert.Contains("name: \"Uat\"", result.Environment.SuggestedYaml);
+        Assert.Contains("path: \"/customers/{customerId}\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("name: \"Get Customer Details\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("  - name: \"Uat\"", result.Environment.DiffYaml);
+        Assert.Contains("+", result.Endpoint.DiffYaml);
+        Assert.Contains("Get Customer Details should return success", result.Endpoint.DiffYaml);
     }
 
     [Fact]
@@ -71,9 +80,13 @@ public sealed class CurlCommandAnalyzerTests
         });
 
         Assert.True(result.Environment.Exists);
+        Assert.Equal("matched", result.Environment.MatchStatus);
         Assert.Contains("PartnerUat", result.Environment.MatchedEnvironmentNames);
-        Assert.Contains(result.Environment.MatchedYamlPreviews, preview => preview.Title == "PartnerUat" && preview.Yaml.Contains("baseUrl: \"https://api.partner.com/AccountHoldingsMgmt\""));
-        Assert.Null(result.Environment.SuggestedYaml);
+        Assert.NotNull(result.Environment.CurrentYaml);
+        Assert.NotNull(result.Environment.SuggestedYaml);
+        Assert.NotNull(result.Environment.DiffYaml);
+        Assert.Contains("name: \"PartnerUat\"", result.Environment.SuggestedYaml);
+        Assert.Contains("baseUrl: \"https://api.partner.com/AccountHoldingsMgmt\"", result.Environment.SuggestedYaml);
         Assert.Equal("/GetAccountList", result.Request?.RelativePath);
     }
 
@@ -103,6 +116,8 @@ public sealed class CurlCommandAnalyzerTests
 
         Assert.False(result.Environment.Exists);
         Assert.False(result.Endpoint.Exists);
+        Assert.Equal("new", result.Environment.MatchStatus);
+        Assert.Equal("new", result.Endpoint.MatchStatus);
         Assert.NotNull(result.Environment.SuggestedYaml);
         Assert.Contains("baseUrl: \"https://api.partner.com\"", result.Environment.SuggestedYaml);
         Assert.Contains("variables:", result.Environment.SuggestedYaml);
@@ -278,6 +293,8 @@ public sealed class CurlCommandAnalyzerTests
 
         Assert.False(result.Environment.Exists);
         Assert.False(result.Endpoint.Exists);
+        Assert.Equal("new", result.Environment.MatchStatus);
+        Assert.Equal("new", result.Endpoint.MatchStatus);
         Assert.NotNull(result.Environment.SuggestedYaml);
         Assert.NotNull(result.Endpoint.SuggestedYaml);
     }
@@ -305,6 +322,88 @@ public sealed class CurlCommandAnalyzerTests
         Assert.Contains("column: \"userRoleID\"", result.Endpoint.SuggestedYaml);
         Assert.Contains("value: \"{{var:userRoleID}}\"", result.Endpoint.SuggestedYaml);
         Assert.Contains("filterType: \"equal\"", result.Endpoint.SuggestedYaml);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ReturnsAmbiguousEnvironmentCandidatesWhenMultipleBaseUrlsMatch()
+    {
+        var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
+        {
+            Environments =
+            [
+                new EnvironmentDefinition
+                {
+                    Name = "PartnerUat",
+                    BaseUrl = "https://api.partner.com"
+                },
+                new EnvironmentDefinition
+                {
+                    Name = "PartnerProd",
+                    BaseUrl = "https://api.partner.com"
+                }
+            ]
+        }));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            Command = "curl --request GET \"https://api.partner.com/customers/C1001\""
+        });
+
+        Assert.True(result.Environment.Exists);
+        Assert.Equal("ambiguous", result.Environment.MatchStatus);
+        Assert.Null(result.Environment.CurrentYaml);
+        Assert.Null(result.Environment.SuggestedYaml);
+        Assert.Null(result.Environment.DiffYaml);
+        Assert.Equal(2, result.Environment.Candidates.Count);
+        Assert.Contains(result.Environment.Candidates, candidate => candidate.Name == "PartnerProd");
+        Assert.Contains(result.Environment.Candidates, candidate => candidate.Name == "PartnerUat");
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ReturnsAmbiguousEndpointCandidatesWhenMultiplePathsMatch()
+    {
+        var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
+        {
+            Environments =
+            [
+                new EnvironmentDefinition
+                {
+                    Name = "Uat",
+                    BaseUrl = "https://api.example.com",
+                    Endpoints =
+                    [
+                        new EndpointDefinition
+                        {
+                            Name = "Get Customer Details",
+                            Method = "GET",
+                            Path = "/customers/{customerId}",
+                            Tests = [ new TestDefinition { Name = "A", ExpectedStatus = 200 } ]
+                        },
+                        new EndpointDefinition
+                        {
+                            Name = "Get Customer Details Raw",
+                            Method = "GET",
+                            Path = "/customers/C1001",
+                            Tests = [ new TestDefinition { Name = "B", ExpectedStatus = 200 } ]
+                        }
+                    ]
+                }
+            ]
+        }));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            Command = "curl --request GET \"https://api.example.com/customers/C1001\""
+        });
+
+        Assert.True(result.Endpoint.Exists);
+        Assert.Equal("ambiguous", result.Endpoint.MatchStatus);
+        Assert.Null(result.Endpoint.CurrentYaml);
+        Assert.Null(result.Endpoint.SuggestedYaml);
+        Assert.Null(result.Endpoint.DiffYaml);
+        Assert.Equal(2, result.Endpoint.Candidates.Count);
+        Assert.Contains(result.Endpoint.Candidates, candidate => candidate.Name == "Get Customer Details");
+        Assert.Contains(result.Endpoint.Candidates, candidate => candidate.Name == "Get Customer Details Raw");
     }
 
     private sealed class StubConfiguredTestSuiteProvider : IConfiguredTestSuiteProvider
