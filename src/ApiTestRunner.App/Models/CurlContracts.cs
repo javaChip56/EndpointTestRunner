@@ -86,6 +86,8 @@ public sealed class CurlEnvironmentAnalysis
     public string? SuggestedYaml { get; init; }
 
     public string? DiffYaml { get; init; }
+
+    public IReadOnlyList<CurlEnvironmentCandidate> Candidates { get; init; } = [];
 }
 
 public sealed class CurlEndpointAnalysis
@@ -107,6 +109,10 @@ public sealed class CurlEndpointAnalysis
     public string? CurrentYaml { get; init; }
 
     public string? SuggestedYaml { get; init; }
+
+    public string? DiffYaml { get; init; }
+
+    public IReadOnlyList<CurlEndpointCandidate> Candidates { get; init; } = [];
 }
 
 public sealed class CurlYamlPreview

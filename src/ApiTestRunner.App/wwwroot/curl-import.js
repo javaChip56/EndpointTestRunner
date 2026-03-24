@@ -477,13 +477,26 @@ function captureAssertionEditorState(fieldValue, ruleValue, controlIds) {
     }
 
     if (state.rule === "contains") {
-        state.containsField = document.getElementById(controlIds.containsFieldInput)?.value ?? "";
-        state.containsRule = document.getElementById(controlIds.containsRuleInput)?.value ?? "";
-        state.containsValue = document.getElementById(controlIds.containsValueInput)?.value ?? "";
+        const containsFieldInput = document.getElementById(controlIds.containsFieldInput);
+        const containsRuleInput = document.getElementById(controlIds.containsRuleInput);
+        const containsValueInput = document.getElementById(controlIds.containsValueInput);
+
+        if (!containsFieldInput || !containsRuleInput || !containsValueInput) {
+            return null;
+        }
+
+        state.containsField = containsFieldInput.value ?? "";
+        state.containsRule = containsRuleInput.value ?? "";
+        state.containsValue = containsValueInput.value ?? "";
         return state;
     }
 
-    state.value = document.getElementById(controlIds.valueInput)?.value ?? "";
+    const valueInput = document.getElementById(controlIds.valueInput);
+    if (!valueInput) {
+        return null;
+    }
+
+    state.value = valueInput.value ?? "";
     return state;
 }
 
@@ -1429,8 +1442,8 @@ function renderEnvironmentCard(environment) {
 }
 
 function renderEndpointCard(endpoint) {
-    const { card, body } = createCard("Endpoint scan", "Checks whether the endpoint already exists, then generates endpoint YAML including every drafted test and its assertions.");
-    body.appendChild(createBadgeRow(endpoint.exists, endpoint.exists ? "Endpoint found" : "Endpoint missing"));
+    const { card, body } = createCard("Endpoint scan", buildEndpointSummary(endpoint));
+    body.appendChild(createMatchBadgeRow(endpoint.matchStatus, getEndpointStatusLabel(endpoint)));
 
     const details = document.createElement("dl");
     details.className = "detail-list";
@@ -1632,6 +1645,24 @@ function createBadgeRow(isPassing, text) {
 
     const badge = document.createElement("span");
     badge.className = `status-badge badge rounded-pill ${isPassing ? "text-bg-success" : "text-bg-danger"}`;
+    badge.textContent = text;
+
+    wrapper.appendChild(badge);
+    return wrapper;
+}
+
+function createMatchBadgeRow(matchStatus, text) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "badge-row";
+
+    const badge = document.createElement("span");
+    const badgeClass = matchStatus === "matched"
+        ? "text-bg-success"
+        : matchStatus === "ambiguous"
+            ? "text-bg-warning"
+            : "text-bg-danger";
+
+    badge.className = `status-badge badge rounded-pill ${badgeClass}`;
     badge.textContent = text;
 
     wrapper.appendChild(badge);
