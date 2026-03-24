@@ -1,0 +1,16 @@
+targetEnvironments:
+- "PetstoreSwaggerIo"
+endpoints:
+- name: "GET Store Inventory"
+  method: "GET"
+  path: "/v2/store/inventory"
+  headers:
+    accept: "application/json"
+    api_key: "special-key"
+  tests:
+  - name: "Busy > 1 and Available < 1"
+    expectedStatus: 200
+    assertions:
+    - field: "sold"
+      greaterThan: 51
+...
