@@ -28,8 +28,11 @@ public sealed class DashboardEndpointEditorService
     {
         var loadedSuite = await _suiteProvider.LoadAsync(cancellationToken);
         var sourceEntry = await ResolveSourceEntryAsync(loadedSuite, environmentId, endpointId, cancellationToken);
-        var seed = DashboardSuiteManifestFactory.CreateEditorSeed(loadedSuite.Suite, environmentId, endpointId)
-            ?? throw new InvalidOperationException("The selected endpoint could not be found in the loaded YAML suite.");
+        var seed = DashboardSuiteManifestFactory.CreateEditorSeed(
+            sourceEntry.Environment,
+            sourceEntry.Endpoint,
+            environmentId,
+            endpointId);
 
         return new DashboardEndpointEditorSeed
         {

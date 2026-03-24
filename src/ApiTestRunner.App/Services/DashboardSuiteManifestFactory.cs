@@ -128,21 +128,33 @@ public static class DashboardSuiteManifestFactory
                     continue;
                 }
 
-                return new DashboardEndpointEditorSeed
-                {
-                    EnvironmentId = environmentId,
-                    EnvironmentName = environment.Name,
-                    EndpointId = endpointId,
-                    EndpointName = endpoint.Name,
-                    CurlCommand = BuildCurlCommand(environment, endpoint),
-                    Tests = endpoint.Tests
-                        .Select(CreateCurlTestDraft)
-                        .ToArray()
-                };
+                return CreateEditorSeed(environment, endpoint, environmentId, endpointId);
             }
         }
 
         return null;
+    }
+
+    public static DashboardEndpointEditorSeed CreateEditorSeed(
+        EnvironmentDefinition environment,
+        EndpointDefinition endpoint,
+        string environmentId,
+        string endpointId)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(endpoint);
+
+        return new DashboardEndpointEditorSeed
+        {
+            EnvironmentId = environmentId,
+            EnvironmentName = environment.Name,
+            EndpointId = endpointId,
+            EndpointName = endpoint.Name,
+            CurlCommand = BuildCurlCommand(environment, endpoint),
+            Tests = endpoint.Tests
+                .Select(CreateCurlTestDraft)
+                .ToArray()
+        };
     }
 
     private static DashboardEnvironmentManifest BuildEnvironmentManifest(EnvironmentDefinition environment)

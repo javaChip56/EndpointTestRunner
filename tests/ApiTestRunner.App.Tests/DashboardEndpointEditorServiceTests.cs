@@ -30,6 +30,78 @@ public sealed class DashboardEndpointEditorServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetEditorSeedAsync_ReturnsEndpointNameForEndpointOnlyFile()
+    {
+        var environmentFilePath = Path.Combine(_tempDirectory, "petstore.io.yaml");
+        var endpointFilePath = Path.Combine(_tempDirectory, "pet.yaml");
+
+        File.WriteAllText(environmentFilePath, """
+            environments:
+              - name: "PetstoreSwaggerIo"
+                baseUrl: "https://petstore.swagger.io"
+            """);
+
+        File.WriteAllText(endpointFilePath, """
+            targetEnvironments:
+              - "PetstoreSwaggerIo"
+            endpoints:
+              - name: "GET Store Inventory"
+                method: "GET"
+                path: "/v2/store/inventory"
+                headers:
+                  accept: "application/json"
+                  api_key: "special-key"
+                tests:
+                  - name: "Test 1"
+                    expectedStatus: 200
+            """);
+
+        var endpoint = new EndpointDefinition
+        {
+            Name = "GET Store Inventory",
+            Method = "GET",
+            Path = "/v2/store/inventory",
+            Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["accept"] = "application/json",
+                ["api_key"] = "special-key"
+            },
+            Tests =
+            [
+                new TestDefinition
+                {
+                    Name = "Test 1",
+                    ExpectedStatus = 200
+                }
+            ]
+        };
+
+        var environment = new EnvironmentDefinition
+        {
+            Name = "PetstoreSwaggerIo",
+            BaseUrl = "https://petstore.swagger.io",
+            Endpoints = [endpoint]
+        };
+
+        var provider = new StubConfiguredTestSuiteProvider(new LoadedTestSuite(
+            new ApiTestSuiteDefinition
+            {
+                Environments = [environment]
+            },
+            [environmentFilePath, endpointFilePath]));
+
+        var service = new DashboardEndpointEditorService(provider);
+
+        var seed = await service.GetEditorSeedAsync(
+            DashboardSuiteManifestFactory.CreateEnvironmentId(environment),
+            DashboardSuiteManifestFactory.CreateEndpointId(environment, endpoint));
+
+        Assert.Equal("GET Store Inventory", seed.EndpointName);
+        Assert.Equal(endpointFilePath, seed.SourceFilePath);
+        Assert.Contains("https://petstore.swagger.io/v2/store/inventory", seed.CurlCommand);
+    }
+
+    [Fact]
     public async Task SaveAsync_UpdatesEndpointYamlFile()
     {
         var (provider, environment, endpoint, _, endpointFilePath) = CreateProvider();

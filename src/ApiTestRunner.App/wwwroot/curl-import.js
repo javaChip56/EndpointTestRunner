@@ -57,6 +57,8 @@ let lastParsedResponseBody = "";
 let isResponseWrapped = true;
 let editorContext = null;
 let busyAction = null;
+let currentAssertionEditIndex = null;
+let currentAssertionEditTestId = null;
 
 async function analyzeCurlCommand() {
     const command = curlInput.value.trim();
@@ -141,6 +143,7 @@ function applyEditorSeed(seed) {
     parsedResponseFields = [];
     parsedResponseObject = null;
     lastParsedResponseBody = "";
+    resetAssertionEditState();
     editorContext = seed.sourceFilePath
         ? {
             environmentId: seed.environmentId,
@@ -164,7 +167,7 @@ function applyEditorSeed(seed) {
     nextTestDraftNumber = Math.max(testDrafts.length + 1, nextTestDraftNumber);
     currentTestDraftId = testDrafts[0]?.id ?? null;
     analysisContainer.innerHTML = "";
-    renderAssertionBuilder();
+    renderAssertionBuilder(null);
     renderResponseStatus("Paste a response body if you want to edit assertions by field picker.", false);
     updateSaveButtonState();
 }
@@ -341,15 +344,18 @@ function collectResponseFields(value, path = "") {
     return fields;
 }
 
-function renderAssertionBuilder() {
+function renderAssertionBuilder(editorState = undefined) {
     ensureAtLeastOneTestDraft();
+    synchronizeAssertionEditState();
+    const nextEditorState = editorState !== undefined
+        ? editorState
+        : captureAssertionBuilderState();
     renderTestDraftList();
     syncCurrentTestInputs();
     renderFieldOptions();
-    renderRuleOptions();
-    renderValueInput();
+    restoreAssertionBuilderState(nextEditorState);
     renderAssertionDrafts();
-    addAssertionButton.disabled = parsedResponseFields.length === 0 || !getCurrentTestDraft();
+    updateAssertionActionButtons();
 }
 
 function ensureAtLeastOneTestDraft() {
@@ -357,11 +363,13 @@ function ensureAtLeastOneTestDraft() {
         const initialDraft = createTestDraft();
         testDrafts.push(initialDraft);
         currentTestDraftId = initialDraft.id;
+        resetAssertionEditState();
         return;
     }
 
     if (!testDrafts.some((draft) => draft.id === currentTestDraftId)) {
         currentTestDraftId = testDrafts[0].id;
+        resetAssertionEditState();
     }
 }
 
@@ -413,7 +421,8 @@ function renderTestDraftList() {
         editButton.textContent = draft.id === currentTestDraftId ? "Editing" : "Edit";
         editButton.addEventListener("click", () => {
             currentTestDraftId = draft.id;
-            renderAssertionBuilder();
+            resetAssertionEditState();
+            renderAssertionBuilder(null);
         });
 
         const removeButton = document.createElement("button");
@@ -442,7 +451,146 @@ function removeTestDraft(testId) {
         currentTestDraftId = testDrafts[0].id;
     }
 
-    renderAssertionBuilder();
+    resetAssertionEditState();
+    renderAssertionBuilder(null);
+}
+
+function captureAssertionBuilderState() {
+    if (assertionFieldSelect.disabled || assertionRuleSelect.disabled) {
+        return null;
+    }
+
+    return captureAssertionEditorState(
+        assertionFieldSelect.value,
+        assertionRuleSelect.value,
+        getAssertionControlIds("assertion"));
+}
+
+function captureAssertionEditorState(fieldValue, ruleValue, controlIds) {
+    const state = {
+        field: fieldValue,
+        rule: ruleValue
+    };
+
+    if (!state.field || !state.rule) {
+        return null;
+    }
+
+    if (state.rule === "contains") {
+        state.containsField = document.getElementById(controlIds.containsFieldInput)?.value ?? "";
+        state.containsRule = document.getElementById(controlIds.containsRuleInput)?.value ?? "";
+        state.containsValue = document.getElementById(controlIds.containsValueInput)?.value ?? "";
+        return state;
+    }
+
+    state.value = document.getElementById(controlIds.valueInput)?.value ?? "";
+    return state;
+}
+
+function restoreAssertionBuilderState(state) {
+    renderRuleOptions();
+
+    if (!state) {
+        renderValueInput();
+        return;
+    }
+
+    if (hasSelectOption(assertionFieldSelect, state.field)) {
+        assertionFieldSelect.value = state.field;
+    }
+
+    renderRuleOptions();
+
+    if (hasSelectOption(assertionRuleSelect, state.rule)) {
+        assertionRuleSelect.value = state.rule;
+    }
+
+    renderValueInput();
+    applyAssertionBuilderValues(state);
+}
+
+function applyAssertionBuilderValues(state) {
+    if (!state) {
+        return;
+    }
+
+    if (state.rule === "contains") {
+        const containsFieldInput = document.getElementById("assertionContainsFieldInput");
+        const containsRuleInput = document.getElementById("assertionContainsRuleInput");
+        const containsValueInput = document.getElementById("assertionContainsValueInput");
+
+        if (containsFieldInput && hasSelectOption(containsFieldInput, state.containsField)) {
+            containsFieldInput.value = state.containsField;
+        }
+
+        if (containsRuleInput && hasSelectOption(containsRuleInput, state.containsRule)) {
+            containsRuleInput.value = state.containsRule;
+        }
+
+        if (containsValueInput && typeof state.containsValue === "string") {
+            containsValueInput.value = state.containsValue;
+        }
+
+        renderValueInput();
+
+        const refreshedContainsFieldInput = document.getElementById("assertionContainsFieldInput");
+        const refreshedContainsRuleInput = document.getElementById("assertionContainsRuleInput");
+        const refreshedContainsValueInput = document.getElementById("assertionContainsValueInput");
+
+        if (refreshedContainsFieldInput && hasSelectOption(refreshedContainsFieldInput, state.containsField)) {
+            refreshedContainsFieldInput.value = state.containsField;
+        }
+
+        if (refreshedContainsRuleInput && hasSelectOption(refreshedContainsRuleInput, state.containsRule)) {
+            refreshedContainsRuleInput.value = state.containsRule;
+        }
+
+        if (refreshedContainsValueInput && typeof state.containsValue === "string") {
+            refreshedContainsValueInput.value = state.containsValue;
+        }
+
+        return;
+    }
+
+    const valueInput = document.getElementById("assertionValueInput");
+    if (valueInput && typeof state.value === "string") {
+        valueInput.value = state.value;
+    }
+}
+
+function hasSelectOption(selectElement, value) {
+    return Boolean(selectElement) && Array.from(selectElement.options).some((option) => option.value === value);
+}
+
+function synchronizeAssertionEditState() {
+    const currentDraft = getCurrentTestDraft();
+    if (!currentDraft ||
+        currentAssertionEditTestId !== currentDraft.id ||
+        currentAssertionEditIndex === null ||
+        currentAssertionEditIndex >= currentDraft.assertions.length) {
+        resetAssertionEditState();
+    }
+}
+
+function isEditingAssertion() {
+    const currentDraft = getCurrentTestDraft();
+    return Boolean(currentDraft) &&
+        currentAssertionEditIndex !== null &&
+        currentAssertionEditTestId === currentDraft.id &&
+        currentAssertionEditIndex < currentDraft.assertions.length;
+}
+
+function resetAssertionEditState() {
+    currentAssertionEditIndex = null;
+    currentAssertionEditTestId = null;
+}
+
+function updateAssertionActionButtons() {
+    const canEditAssertions = parsedResponseFields.length > 0 && Boolean(getCurrentTestDraft()) && busyAction === null;
+    const isEditing = isEditingAssertion();
+
+    addAssertionButton.disabled = !canEditAssertions || isEditing;
+    addAssertionButton.innerHTML = "<i class=\"fa-solid fa-plus button-icon\"></i>Add Assertion";
 }
 
 function syncCurrentTestInputs() {
@@ -458,83 +606,75 @@ function syncCurrentTestInputs() {
 }
 
 function renderFieldOptions() {
-    assertionFieldSelect.innerHTML = "";
-
-    if (parsedResponseFields.length === 0) {
-        const option = document.createElement("option");
-        option.textContent = "Parse a response body first";
-        option.value = "";
-        assertionFieldSelect.appendChild(option);
-        assertionFieldSelect.disabled = true;
-        return;
-    }
-
-    assertionFieldSelect.disabled = false;
-
-    for (const field of parsedResponseFields) {
-        const option = document.createElement("option");
-        option.value = field.path;
-        option.textContent = `${field.path} (${field.type})`;
-        assertionFieldSelect.appendChild(option);
-    }
+    populateFieldSelect(assertionFieldSelect);
 }
 
 function renderRuleOptions() {
-    assertionRuleSelect.innerHTML = "";
-
-    const field = getSelectedField();
-    if (!field) {
-        assertionRuleSelect.disabled = true;
-        return;
-    }
-
-    const supportedRules = getRulesForFieldType(field.type);
-    supportedRules.forEach((rule) => {
-        const option = document.createElement("option");
-        option.value = rule;
-        option.textContent = assertionRuleDefinitions[rule].label;
-        assertionRuleSelect.appendChild(option);
-    });
-
-    assertionRuleSelect.disabled = false;
+    populateRuleSelect(assertionRuleSelect, getSelectedField()?.type, assertionRuleSelect.value);
 }
 
 function renderValueInput() {
     const previousContainsField = document.getElementById("assertionContainsFieldInput")?.value ?? "";
     const previousContainsRule = document.getElementById("assertionContainsRuleInput")?.value ?? "";
     const previousContainsValue = document.getElementById("assertionContainsValueInput")?.value ?? "";
-    assertionValueContainer.innerHTML = "";
     const field = getSelectedField();
     const rule = assertionRuleSelect.value;
 
+    renderAssertionValueEditor(
+        assertionValueContainer,
+        field,
+        rule,
+        getAssertionControlIds("assertion"),
+        {
+            containsField: previousContainsField,
+            containsRule: previousContainsRule,
+            containsValue: previousContainsValue
+        },
+        renderValueInput);
+}
+
+function renderAssertionValueEditor(container, field, rule, controlIds, state = {}, onEditorChange = null) {
+    container.innerHTML = "";
     const label = document.createElement("span");
     label.textContent = "Value";
-    assertionValueContainer.appendChild(label);
+    container.appendChild(label);
+
     const isContainsRule = rule === "contains";
-    assertionBuilderGrid.classList.toggle("has-complex-value", isContainsRule);
-    assertionValueContainer.classList.toggle("field-stack-wide", isContainsRule);
+    if (container === assertionValueContainer) {
+        assertionBuilderGrid.classList.toggle("has-complex-value", isContainsRule);
+        assertionValueContainer.classList.toggle("field-stack-wide", isContainsRule);
+    }
 
     if (!field || !rule) {
-        assertionBuilderGrid.classList.remove("has-complex-value");
-        assertionValueContainer.classList.remove("field-stack-wide");
+        if (container === assertionValueContainer) {
+            assertionBuilderGrid.classList.remove("has-complex-value");
+            assertionValueContainer.classList.remove("field-stack-wide");
+        }
+
         const input = document.createElement("input");
         input.className = "form-control tool-input-inline";
         input.type = "text";
         input.disabled = true;
-        assertionValueContainer.appendChild(input);
+        container.appendChild(input);
         return;
     }
 
     const definition = assertionRuleDefinitions[rule];
-
     if (rule === "contains") {
-        renderContainsValueInput(field, previousContainsField, previousContainsRule, previousContainsValue);
+        renderContainsValueInput(
+            container,
+            field,
+            state.containsField ?? "",
+            state.containsRule ?? "",
+            state.containsValue ?? "",
+            controlIds,
+            onEditorChange);
         return;
     }
 
     if (definition.valueMode === "select") {
         const select = document.createElement("select");
-        select.id = "assertionValueInput";
+        select.id = controlIds.valueInput;
         select.className = "form-select tool-select";
 
         definition.options.forEach((optionDefinition) => {
@@ -550,40 +690,48 @@ function renderValueInput() {
             select.appendChild(option);
         });
 
-        assertionValueContainer.appendChild(select);
+        if (typeof state.value === "string" && state.value !== "") {
+            select.value = state.value;
+        }
+
+        container.appendChild(select);
         return;
     }
 
     const input = document.createElement("input");
-    input.id = "assertionValueInput";
+    input.id = controlIds.valueInput;
     input.className = "form-control tool-input-inline";
 
     if (definition.valueMode === "number") {
         input.type = "number";
         input.step = "any";
-        input.value = Array.isArray(field.sample) ? String(field.sample.length) : "1";
+        input.value = typeof state.value === "string" && state.value !== ""
+            ? state.value
+            : Array.isArray(field.sample) ? String(field.sample.length) : "1";
     } else {
         input.type = "text";
-        input.value = definition.valueMode === "typed" ? formatSample(field.sample) : "";
+        input.value = typeof state.value === "string"
+            ? state.value
+            : definition.valueMode === "typed" ? formatSample(field.sample) : "";
     }
 
-    assertionValueContainer.appendChild(input);
+    container.appendChild(input);
 }
 
-function renderContainsValueInput(field, selectedRelativeField, selectedRelativeRule, selectedRelativeValue) {
+function renderContainsValueInput(container, field, selectedRelativeField, selectedRelativeRule, selectedRelativeValue, controlIds, onEditorChange) {
     const containsFieldOptions = getContainsFieldOptions(field?.sample);
 
     if (containsFieldOptions.length === 0) {
         const helper = document.createElement("span");
         helper.className = "helper-text";
         helper.textContent = "contains currently supports arrays of objects.";
-        assertionValueContainer.appendChild(helper);
+        container.appendChild(helper);
 
         const input = document.createElement("input");
         input.className = "form-control tool-input-inline";
         input.type = "text";
         input.disabled = true;
-        assertionValueContainer.appendChild(input);
+        container.appendChild(input);
         return;
     }
 
@@ -598,7 +746,7 @@ function renderContainsValueInput(field, selectedRelativeField, selectedRelative
     fieldStack.appendChild(fieldLabel);
 
     const select = document.createElement("select");
-    select.id = "assertionContainsFieldInput";
+    select.id = controlIds.containsFieldInput;
     select.className = "form-select tool-select";
 
     containsFieldOptions.forEach((optionDefinition) => {
@@ -612,9 +760,7 @@ function renderContainsValueInput(field, selectedRelativeField, selectedRelative
         select.value = selectedRelativeField;
     }
 
-    select.addEventListener("change", () => {
-        renderValueInput();
-    });
+    select.addEventListener("change", () => onEditorChange?.());
 
     fieldStack.appendChild(select);
     layout.appendChild(fieldStack);
@@ -628,7 +774,7 @@ function renderContainsValueInput(field, selectedRelativeField, selectedRelative
     ruleStack.appendChild(ruleLabel);
 
     const ruleSelect = document.createElement("select");
-    ruleSelect.id = "assertionContainsRuleInput";
+    ruleSelect.id = controlIds.containsRuleInput;
     ruleSelect.className = "form-select tool-select";
 
     getContainsRulesForFieldType(selectedFieldDefinition.type).forEach((rule) => {
@@ -644,9 +790,7 @@ function renderContainsValueInput(field, selectedRelativeField, selectedRelative
         ruleSelect.value = selectedRelativeRule;
     }
 
-    ruleSelect.addEventListener("change", () => {
-        renderValueInput();
-    });
+    ruleSelect.addEventListener("change", () => onEditorChange?.());
 
     ruleStack.appendChild(ruleSelect);
     layout.appendChild(ruleStack);
@@ -658,19 +802,19 @@ function renderContainsValueInput(field, selectedRelativeField, selectedRelative
     valueLabel.textContent = "Match value";
     valueStack.appendChild(valueLabel);
 
-    const valueInput = createContainsValueInput(selectedFieldDefinition, ruleSelect.value, selectedRelativeValue);
+    const valueInput = createContainsValueInput(selectedFieldDefinition, ruleSelect.value, selectedRelativeValue, controlIds);
     valueStack.appendChild(valueInput);
     layout.appendChild(valueStack);
 
-    assertionValueContainer.appendChild(layout);
+    container.appendChild(layout);
 }
 
-function createContainsValueInput(fieldDefinition, rule, previousValue) {
+function createContainsValueInput(fieldDefinition, rule, previousValue, controlIds) {
     const definition = assertionRuleDefinitions[rule];
 
     if (definition.valueMode === "select") {
         const select = document.createElement("select");
-        select.id = "assertionContainsValueInput";
+        select.id = controlIds.containsValueInput;
         select.className = "form-select tool-select";
 
         definition.options.forEach((optionDefinition) => {
@@ -698,7 +842,7 @@ function createContainsValueInput(fieldDefinition, rule, previousValue) {
     }
 
     const input = document.createElement("input");
-    input.id = "assertionContainsValueInput";
+    input.id = controlIds.containsValueInput;
     input.className = "form-control tool-input-inline";
 
     if (definition.valueMode === "number") {
@@ -710,6 +854,63 @@ function createContainsValueInput(fieldDefinition, rule, previousValue) {
 
     input.value = previousValue || formatSample(fieldDefinition.sample);
     return input;
+}
+
+function getAssertionControlIds(prefix) {
+    return {
+        valueInput: `${prefix}ValueInput`,
+        containsFieldInput: `${prefix}ContainsFieldInput`,
+        containsRuleInput: `${prefix}ContainsRuleInput`,
+        containsValueInput: `${prefix}ContainsValueInput`
+    };
+}
+
+function populateFieldSelect(selectElement) {
+    selectElement.innerHTML = "";
+
+    if (parsedResponseFields.length === 0) {
+        const option = document.createElement("option");
+        option.textContent = "Parse a response body first";
+        option.value = "";
+        selectElement.appendChild(option);
+        selectElement.disabled = true;
+        return;
+    }
+
+    selectElement.disabled = false;
+
+    for (const field of parsedResponseFields) {
+        const option = document.createElement("option");
+        option.value = field.path;
+        option.textContent = `${field.path} (${field.type})`;
+        selectElement.appendChild(option);
+    }
+}
+
+function populateRuleSelect(selectElement, fieldType, preferredRule) {
+    selectElement.innerHTML = "";
+
+    if (!fieldType) {
+        selectElement.disabled = true;
+        return;
+    }
+
+    const supportedRules = getRulesForFieldType(fieldType);
+    supportedRules.forEach((rule) => {
+        const option = document.createElement("option");
+        option.value = rule;
+        option.textContent = assertionRuleDefinitions[rule].label;
+        selectElement.appendChild(option);
+    });
+
+    selectElement.disabled = false;
+    if (preferredRule && supportedRules.includes(preferredRule)) {
+        selectElement.value = preferredRule;
+    }
+}
+
+function getFieldDefinitionByPath(path) {
+    return parsedResponseFields.find((field) => field.path === path) ?? null;
 }
 
 function getContainsFieldOptions(sample) {
@@ -743,7 +944,7 @@ function getSelectedField() {
         return null;
     }
 
-    return parsedResponseFields.find((field) => field.path === assertionFieldSelect.value) ?? parsedResponseFields[0];
+    return getFieldDefinitionByPath(assertionFieldSelect.value) ?? parsedResponseFields[0];
 }
 
 function getRulesForFieldType(fieldType) {
@@ -803,23 +1004,30 @@ function addAssertionDraft() {
     const valueInput = document.getElementById("assertionValueInput");
     const value = convertAssertionValue(rule, field.type, valueInput);
 
-    currentDraft.assertions.push({
+    const updatedAssertion = {
         field: field.path,
         rule,
         value
-    });
+    };
 
-    renderAssertionDrafts();
-    renderTestDraftList();
+    if (isEditingAssertion()) {
+        currentDraft.assertions[currentAssertionEditIndex] = updatedAssertion;
+        renderResponseStatus("Assertion updated.", false);
+    } else {
+        currentDraft.assertions.push(updatedAssertion);
+        renderResponseStatus("Assertion added.", false);
+    }
+
+    resetAssertionEditState();
+    renderAssertionBuilder(null);
 }
 
-function convertAssertionValue(rule, fieldType, input) {
+function convertAssertionValue(rule, fieldType, input, controlIds = getAssertionControlIds("assertion"), currentFieldDefinition = getSelectedField()) {
     if (rule === "contains") {
-        const relativeFieldInput = document.getElementById("assertionContainsFieldInput");
-        const relativeRuleInput = document.getElementById("assertionContainsRuleInput");
-        const relativeValueInput = document.getElementById("assertionContainsValueInput");
-        const currentField = getSelectedField();
-        const containsFieldOptions = getContainsFieldOptions(currentField?.sample);
+        const relativeFieldInput = document.getElementById(controlIds.containsFieldInput);
+        const relativeRuleInput = document.getElementById(controlIds.containsRuleInput);
+        const relativeValueInput = document.getElementById(controlIds.containsValueInput);
+        const containsFieldOptions = getContainsFieldOptions(currentFieldDefinition?.sample);
         const containsField = containsFieldOptions.find((option) => option.path === relativeFieldInput?.value);
         const containsRule = relativeRuleInput?.value || "equals";
 
@@ -911,24 +1119,233 @@ function renderAssertionDrafts() {
         const item = document.createElement("div");
         item.className = "assertion-draft-item card card-outline card-light";
 
-        const text = document.createElement("span");
-        text.className = "assertion-draft-text";
-        text.textContent = `${draft.field} -> ${draft.rule}: ${formatSample(draft.value)}`;
+        if (isEditingAssertion() && currentAssertionEditIndex === index) {
+            item.appendChild(createInlineAssertionEditor(draft, index));
+        } else {
+            const text = document.createElement("span");
+            text.className = "assertion-draft-text";
+            text.textContent = `${draft.field} -> ${draft.rule}: ${formatSample(draft.value)}`;
 
-        const removeButton = document.createElement("button");
-        removeButton.type = "button";
-        removeButton.className = "btn btn-default btn-sm";
-        removeButton.textContent = "Remove";
-        removeButton.addEventListener("click", () => {
-            currentDraft.assertions.splice(index, 1);
-            renderAssertionDrafts();
-            renderTestDraftList();
-        });
+            const actions = document.createElement("div");
+            actions.className = "test-draft-actions";
 
-        item.appendChild(text);
-        item.appendChild(removeButton);
+            const editButton = document.createElement("button");
+            editButton.type = "button";
+            editButton.className = "btn btn-default btn-sm";
+            editButton.textContent = "Edit";
+            editButton.disabled = isEditingAssertion();
+            editButton.addEventListener("click", () => startAssertionEdit(index));
+
+            const removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.className = "btn btn-default btn-sm";
+            removeButton.textContent = "Remove";
+            removeButton.disabled = isEditingAssertion();
+            removeButton.addEventListener("click", () => {
+                currentDraft.assertions.splice(index, 1);
+                if (currentAssertionEditIndex === index) {
+                    resetAssertionEditState();
+                }
+                renderAssertionBuilder(null);
+            });
+
+            actions.appendChild(editButton);
+            actions.appendChild(removeButton);
+            item.appendChild(text);
+            item.appendChild(actions);
+        }
+
         assertionList.appendChild(item);
     });
+}
+
+function createInlineAssertionEditor(draft, index) {
+    const editor = document.createElement("div");
+    editor.className = "assertion-inline-editor";
+
+    const fieldsGrid = document.createElement("div");
+    fieldsGrid.className = "assertion-inline-grid";
+
+    const fieldStack = document.createElement("label");
+    fieldStack.className = "field-stack";
+    const fieldLabel = document.createElement("span");
+    fieldLabel.textContent = "Field";
+    const fieldSelect = document.createElement("select");
+    fieldSelect.className = "form-select tool-select";
+    populateFieldSelect(fieldSelect);
+    if (hasSelectOption(fieldSelect, draft.field)) {
+        fieldSelect.value = draft.field;
+    }
+    fieldStack.appendChild(fieldLabel);
+    fieldStack.appendChild(fieldSelect);
+    fieldsGrid.appendChild(fieldStack);
+
+    const ruleStack = document.createElement("label");
+    ruleStack.className = "field-stack";
+    const ruleLabel = document.createElement("span");
+    ruleLabel.textContent = "Rule";
+    const ruleSelect = document.createElement("select");
+    ruleSelect.className = "form-select tool-select";
+    ruleStack.appendChild(ruleLabel);
+    ruleStack.appendChild(ruleSelect);
+    fieldsGrid.appendChild(ruleStack);
+
+    const valueStack = document.createElement("div");
+    valueStack.className = "field-stack assertion-inline-value";
+    fieldsGrid.appendChild(valueStack);
+
+    const editorState = buildAssertionEditorStateFromDraft(draft);
+    const controlIds = {
+        valueInput: `inlineAssertionValueInput-${index}`,
+        containsFieldInput: `inlineAssertionContainsFieldInput-${index}`,
+        containsRuleInput: `inlineAssertionContainsRuleInput-${index}`,
+        containsValueInput: `inlineAssertionContainsValueInput-${index}`
+    };
+
+    const renderEditorValue = () => {
+        const currentEditorState = captureAssertionEditorState(fieldSelect.value, ruleSelect.value, controlIds) ?? editorState;
+        const selectedField = getFieldDefinitionByPath(fieldSelect.value);
+        populateRuleSelect(ruleSelect, selectedField?.type, currentEditorState.rule);
+        renderAssertionValueEditor(
+            valueStack,
+            selectedField,
+            ruleSelect.value,
+            controlIds,
+            currentEditorState,
+            renderEditorValue);
+    };
+
+    populateRuleSelect(ruleSelect, getFieldDefinitionByPath(fieldSelect.value)?.type, editorState.rule);
+    renderEditorValue();
+
+    fieldSelect.addEventListener("change", () => {
+        editorState.field = fieldSelect.value;
+        editorState.rule = "";
+        renderEditorValue();
+    });
+
+    ruleSelect.addEventListener("change", () => {
+        editorState.rule = ruleSelect.value;
+        renderEditorValue();
+    });
+
+    const actions = document.createElement("div");
+    actions.className = "test-draft-actions assertion-inline-actions";
+
+    const saveButton = document.createElement("button");
+    saveButton.type = "button";
+    saveButton.className = "btn btn-primary btn-sm";
+    saveButton.textContent = "Save";
+    saveButton.addEventListener("click", () => saveInlineAssertionEdit(index, fieldSelect, ruleSelect, controlIds));
+
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.className = "btn btn-default btn-sm";
+    cancelButton.textContent = "Cancel";
+    cancelButton.addEventListener("click", cancelAssertionEdit);
+
+    actions.appendChild(saveButton);
+    actions.appendChild(cancelButton);
+
+    editor.appendChild(fieldsGrid);
+    editor.appendChild(actions);
+    return editor;
+}
+
+function saveInlineAssertionEdit(index, fieldSelect, ruleSelect, controlIds) {
+    const currentDraft = getCurrentTestDraft();
+    const selectedField = getFieldDefinitionByPath(fieldSelect.value);
+    const selectedRule = ruleSelect.value;
+    const valueInput = document.getElementById(
+        selectedRule === "contains" ? controlIds.containsValueInput : controlIds.valueInput);
+
+    if (!currentDraft || !selectedField || !selectedRule || !valueInput) {
+        renderResponseStatus("Choose a field and rule before saving the assertion.", true);
+        return;
+    }
+
+    currentDraft.assertions[index] = {
+        field: selectedField.path,
+        rule: selectedRule,
+        value: convertAssertionValue(selectedRule, selectedField.type, valueInput, controlIds, selectedField)
+    };
+
+    resetAssertionEditState();
+    renderAssertionBuilder(null);
+    renderResponseStatus("Assertion updated.", false);
+}
+
+function startAssertionEdit(index) {
+    const currentDraft = getCurrentTestDraft();
+    const assertion = currentDraft?.assertions[index];
+
+    if (!currentDraft || !assertion) {
+        return;
+    }
+
+    if (parsedResponseFields.length === 0) {
+        renderResponseStatus("Paste and parse a response body before editing an assertion.", true);
+        return;
+    }
+
+    currentAssertionEditIndex = index;
+    currentAssertionEditTestId = currentDraft.id;
+    renderAssertionBuilder(captureAssertionBuilderState());
+    renderResponseStatus("Editing assertion inline. Save or cancel from the assertion row.", false);
+}
+
+function cancelAssertionEdit() {
+    if (!isEditingAssertion()) {
+        return;
+    }
+
+    resetAssertionEditState();
+    renderAssertionBuilder(captureAssertionBuilderState());
+    renderResponseStatus("Assertion edit cancelled.", false);
+}
+
+function buildAssertionEditorStateFromDraft(draft) {
+    const state = {
+        field: draft.field,
+        rule: draft.rule
+    };
+
+    if (draft.rule === "contains") {
+        const [containsField, containsDefinition] = Object.entries(draft.value ?? {})[0] ?? [];
+        state.containsField = containsField ?? "";
+
+        if (containsDefinition &&
+            typeof containsDefinition === "object" &&
+            !Array.isArray(containsDefinition)) {
+            const [containsRule, containsValue] = Object.entries(containsDefinition)[0] ?? [];
+            if (containsRule && assertionRuleDefinitions[containsRule]) {
+                state.containsRule = containsRule;
+                state.containsValue = stringifyAssertionEditorValue(containsRule, containsValue);
+                return state;
+            }
+        }
+
+        state.containsRule = "equals";
+        state.containsValue = stringifyAssertionEditorValue("equals", containsDefinition);
+        return state;
+    }
+
+    state.value = stringifyAssertionEditorValue(draft.rule, draft.value);
+    return state;
+}
+
+function stringifyAssertionEditorValue(rule, value) {
+    if (value === null || typeof value === "undefined") {
+        return "";
+    }
+
+    if (rule === "notEmpty") {
+        return value === true ? "true" : "false";
+    }
+
+    return typeof value === "string"
+        ? value
+        : formatSample(value);
 }
 
 function renderResult(result) {
@@ -1321,7 +1738,6 @@ function setBusy(isBusy, action = null) {
     busyAction = isBusy ? action : null;
     analyzeButton.disabled = isBusy;
     saveEndpointButton.disabled = isBusy || !editorContext;
-    addAssertionButton.disabled = isBusy || parsedResponseFields.length === 0 || !getCurrentTestDraft();
     addTestButton.disabled = isBusy;
     endpointNameInput.disabled = isBusy;
     testNameInput.disabled = isBusy;
@@ -1335,6 +1751,7 @@ function setBusy(isBusy, action = null) {
         ? "<i class=\"fa-solid fa-spinner fa-spin button-icon\"></i>Saving..."
         : "<i class=\"fa-solid fa-floppy-disk button-icon\"></i>Save Endpoint YAML";
     updateSaveButtonState();
+    updateAssertionActionButtons();
 }
 
 async function buildErrorMessage(response, fallbackMessage) {
@@ -1389,7 +1806,8 @@ addTestButton.addEventListener("click", () => {
     const newDraft = createTestDraft();
     testDrafts.push(newDraft);
     currentTestDraftId = newDraft.id;
-    renderAssertionBuilder();
+    resetAssertionEditState();
+    renderAssertionBuilder(null);
 });
 
 testNameInput.addEventListener("input", () => {

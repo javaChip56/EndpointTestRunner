@@ -630,6 +630,10 @@ body.app-shell {
     line-height: 1.5;
 }
 
+#curlInput {
+    min-height: 18rem;
+}
+
 .response-preview-actions {
     margin-bottom: 0.8rem;
 }
@@ -637,6 +641,10 @@ body.app-shell {
 .response-preview-input {
     min-height: 20rem;
     font-size: 0.9rem;
+}
+
+#responseBodyInput {
+    min-height: 24rem;
 }
 
 .response-preview-input.is-wrapped {
@@ -710,6 +718,27 @@ body.app-shell {
     min-width: 0;
     text-align: left;
     word-break: break-word;
+}
+
+.assertion-inline-editor {
+    display: grid;
+    gap: 0.9rem;
+    width: 100%;
+}
+
+.assertion-inline-grid {
+    display: grid;
+    gap: 0.9rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    width: 100%;
+}
+
+.assertion-inline-value {
+    min-width: 0;
+}
+
+.assertion-inline-actions {
+    justify-content: flex-end;
 }
 
 .test-draft-info {
