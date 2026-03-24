@@ -157,15 +157,30 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
             Environment = new CurlEnvironmentAnalysis
             {
                 Exists = matchedEnvironments.Length > 0,
+                MatchStatus = environmentMatchStatus,
                 SuggestedName = suggestedEnvironmentName,
                 MatchedEnvironmentNames = matchedEnvironments.Select(environment => environment.Name).ToArray(),
                 MatchedYamlPreviews = matchedEnvironmentPreviews,
                 SuggestedFilePath = matchedEnvironments.Length > 0
                     ? null
-                    : BuildEnvironmentFilePath(suggestedEnvironmentName),
-                SuggestedYaml = matchedEnvironments.Length > 0
-                    ? null
-                    : GenerateEnvironmentYaml(suggestedEnvironmentName, parsedRequest.BaseUrl, variableSuggestions.Variables)
+                    : GenerateEnvironmentYamlFromDefinition(matchedEnvironment),
+                SuggestedYaml = environmentCandidates.Length switch
+                {
+                    0 => GenerateEnvironmentYaml(suggestedEnvironmentName, parsedRequest.BaseUrl, variableSuggestions.Variables),
+                    1 => GenerateEnvironmentYaml(
+                        environmentCandidates[0].Name,
+                        matchedEnvironment!.BaseUrl,
+                        MergeVariables(matchedEnvironment!.Variables, variableSuggestions.Variables)),
+                    _ => null
+                },
+                DiffYaml = environmentCandidates.Length == 1
+                    ? GenerateDiff(
+                        GenerateEnvironmentYamlFromDefinition(matchedEnvironment!),
+                        GenerateEnvironmentYaml(
+                            environmentCandidates[0].Name,
+                            matchedEnvironment!.BaseUrl,
+                            MergeVariables(matchedEnvironment!.Variables, variableSuggestions.Variables)))
+                    : null
             },
             Endpoint = new CurlEndpointAnalysis
             {
@@ -188,7 +203,7 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
                 SuggestedYaml = variableSuggestions.Variables.Count == 0
                     ? null
                     : GenerateVariablesYaml(variableSuggestions.Variables),
-                IncludedInEnvironmentYaml = matchedEnvironments.Length == 0 && variableSuggestions.Variables.Count > 0
+                IncludedInEnvironmentYaml = environmentCandidates.Length <= 1 && variableSuggestions.Variables.Count > 0
             },
             Warnings = warnings
         };
@@ -662,6 +677,82 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
         return normalized.Length > 1 ? normalized.TrimEnd('/') : normalized;
     }
 
+    private static string GetMatchStatus(int candidateCount)
+    {
+        return candidateCount switch
+        {
+            0 => "new",
+            1 => "matched",
+            _ => "ambiguous"
+        };
+    }
+
+    private static string GenerateDiff(string original, string updated)
+    {
+        var originalLines = original.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        var updatedLines = updated.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        var lcs = BuildLcsTable(originalLines, updatedLines);
+        var diffLines = new List<string>();
+        var originalIndex = 0;
+        var updatedIndex = 0;
+
+        while (originalIndex < originalLines.Length && updatedIndex < updatedLines.Length)
+        {
+            if (string.Equals(originalLines[originalIndex], updatedLines[updatedIndex], StringComparison.Ordinal))
+            {
+                diffLines.Add($"  {originalLines[originalIndex]}");
+                originalIndex++;
+                updatedIndex++;
+                continue;
+            }
+
+            if (lcs[originalIndex + 1, updatedIndex] >= lcs[originalIndex, updatedIndex + 1])
+            {
+                diffLines.Add($"- {originalLines[originalIndex]}");
+                originalIndex++;
+            }
+            else
+            {
+                diffLines.Add($"+ {updatedLines[updatedIndex]}");
+                updatedIndex++;
+            }
+        }
+
+        while (originalIndex < originalLines.Length)
+        {
+            diffLines.Add($"- {originalLines[originalIndex]}");
+            originalIndex++;
+        }
+
+        while (updatedIndex < updatedLines.Length)
+        {
+            diffLines.Add($"+ {updatedLines[updatedIndex]}");
+            updatedIndex++;
+        }
+
+        return string.Join(Environment.NewLine, diffLines);
+    }
+
+    private static int[,] BuildLcsTable(IReadOnlyList<string> originalLines, IReadOnlyList<string> updatedLines)
+    {
+        var table = new int[originalLines.Count + 1, updatedLines.Count + 1];
+
+        for (var originalIndex = originalLines.Count - 1; originalIndex >= 0; originalIndex--)
+        {
+            for (var updatedIndex = updatedLines.Count - 1; updatedIndex >= 0; updatedIndex--)
+            {
+                table[originalIndex, updatedIndex] = string.Equals(
+                    originalLines[originalIndex],
+                    updatedLines[updatedIndex],
+                    StringComparison.Ordinal)
+                    ? table[originalIndex + 1, updatedIndex + 1] + 1
+                    : Math.Max(table[originalIndex + 1, updatedIndex], table[originalIndex, updatedIndex + 1]);
+            }
+        }
+
+        return table;
+    }
+
     private object? ReplaceBodyScalarsWithVariables(
         object? value,
         IDictionary<string, object?> variables,
@@ -771,6 +862,14 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
         return SerializeYaml(document);
     }
 
+    private string GenerateEnvironmentYamlFromDefinition(EnvironmentDefinition environment)
+    {
+        return GenerateEnvironmentYaml(
+            environment.Name,
+            environment.BaseUrl,
+            environment.Variables);
+    }
+
     private string GenerateVariablesYaml(IReadOnlyDictionary<string, object?> variables)
     {
         return SerializeYaml(new Dictionary<string, object?>
@@ -804,6 +903,10 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
         string endpointName,
         IReadOnlyList<CurlTestDraft> tests)
     {
+        var resolvedEndpointName = string.IsNullOrWhiteSpace(endpointName)
+            ? SuggestEndpointName(request.Method, endpointPath)
+            : endpointName;
+
         var endpoint = new Dictionary<string, object?>
         {
             ["name"] = endpointName,
