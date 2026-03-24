@@ -7,6 +7,11 @@ namespace ApiTestRunner.App.Services;
 
 public static class DashboardSuiteManifestFactory
 {
+    private static readonly System.Text.Json.JsonSerializerOptions CurlJsonSerializerOptions = new(System.Text.Json.JsonSerializerDefaults.Web)
+    {
+        WriteIndented = false
+    };
+
     public static DashboardSuiteManifest Create(ApiTestSuiteDefinition suite)
     {
         ArgumentNullException.ThrowIfNull(suite);
@@ -92,11 +97,71 @@ public static class DashboardSuiteManifestFactory
             testIndex.ToString());
     }
 
+    public static string CreateEnvironmentId(EnvironmentDefinition environment)
+    {
+        return CreateStableId("environment", environment.Name, environment.BaseUrl);
+    }
+
+    public static string CreateEndpointId(EnvironmentDefinition environment, EndpointDefinition endpoint)
+    {
+        return CreateStableId("endpoint", environment.Name, endpoint.Method, endpoint.Path, endpoint.Name);
+    }
+
+    public static DashboardEndpointEditorSeed? CreateEditorSeed(
+        ApiTestSuiteDefinition suite,
+        string environmentId,
+        string endpointId)
+    {
+        ArgumentNullException.ThrowIfNull(suite);
+
+        foreach (var environment in suite.Environments)
+        {
+            if (!string.Equals(CreateEnvironmentId(environment), environmentId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            foreach (var endpoint in environment.Endpoints)
+            {
+                if (!string.Equals(CreateEndpointId(environment, endpoint), endpointId, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                return CreateEditorSeed(environment, endpoint, environmentId, endpointId);
+            }
+        }
+
+        return null;
+    }
+
+    public static DashboardEndpointEditorSeed CreateEditorSeed(
+        EnvironmentDefinition environment,
+        EndpointDefinition endpoint,
+        string environmentId,
+        string endpointId)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(endpoint);
+
+        return new DashboardEndpointEditorSeed
+        {
+            EnvironmentId = environmentId,
+            EnvironmentName = environment.Name,
+            EndpointId = endpointId,
+            EndpointName = endpoint.Name,
+            CurlCommand = BuildCurlCommand(environment, endpoint),
+            Tests = endpoint.Tests
+                .Select(CreateCurlTestDraft)
+                .ToArray()
+        };
+    }
+
     private static DashboardEnvironmentManifest BuildEnvironmentManifest(EnvironmentDefinition environment)
     {
         return new DashboardEnvironmentManifest
         {
-            Id = CreateStableId("environment", environment.Name, environment.BaseUrl),
+            Id = CreateEnvironmentId(environment),
             Name = environment.Name,
             BaseUrl = environment.BaseUrl,
             Endpoints = environment.Endpoints
@@ -110,7 +175,7 @@ public static class DashboardSuiteManifestFactory
     {
         return new DashboardEndpointManifest
         {
-            Id = CreateStableId("endpoint", environment.Name, endpoint.Method, endpoint.Path, endpoint.Name),
+            Id = CreateEndpointId(environment, endpoint),
             Name = endpoint.Name,
             Method = endpoint.Method.ToUpperInvariant(),
             Path = endpoint.Path,
@@ -129,5 +194,130 @@ public static class DashboardSuiteManifestFactory
     {
         var raw = string.Join("|", parts);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw)));
+    }
+
+    private static CurlTestDraft CreateCurlTestDraft(TestDefinition test)
+    {
+        return new CurlTestDraft
+        {
+            Name = test.Name,
+            ExpectedStatus = test.ExpectedStatus,
+            Assertions = ExpandAssertionDrafts(test.Assertions)
+        };
+    }
+
+    private static IReadOnlyList<CurlAssertionDraft> ExpandAssertionDrafts(IReadOnlyList<AssertionDefinition> assertions)
+    {
+        var drafts = new List<CurlAssertionDraft>();
+
+        foreach (var assertion in assertions)
+        {
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "equals", assertion.EqualsValue);
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "notEquals", assertion.NotEquals);
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "type", assertion.Type);
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "containsText", assertion.ContainsText);
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "startsWith", assertion.StartsWith);
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "endsWith", assertion.EndsWith);
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "notEmpty", assertion.NotEmpty);
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "greaterThan", assertion.GreaterThan);
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "greaterThanOrEqual", assertion.GreaterThanOrEqual);
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "lessThan", assertion.LessThan);
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "lessThanOrEqual", assertion.LessThanOrEqual);
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "minCount", assertion.MinCount);
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "maxCount", assertion.MaxCount);
+            AddAssertionDraftIfPresent(drafts, assertion.Field, "count", assertion.Count);
+
+            if (assertion.Contains.Count > 0)
+            {
+                drafts.Add(new CurlAssertionDraft
+                {
+                    Field = assertion.Field,
+                    Rule = "contains",
+                    Value = assertion.Contains.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase)
+                });
+            }
+        }
+
+        return drafts;
+    }
+
+    private static void AddAssertionDraftIfPresent(
+        ICollection<CurlAssertionDraft> drafts,
+        string field,
+        string rule,
+        object? value)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        drafts.Add(new CurlAssertionDraft
+        {
+            Field = field,
+            Rule = rule,
+            Value = value
+        });
+    }
+
+    private static string BuildCurlCommand(EnvironmentDefinition environment, EndpointDefinition endpoint)
+    {
+        var command = new StringBuilder();
+        command.Append("curl --request ");
+        command.Append(endpoint.Method.ToUpperInvariant());
+        command.Append(' ');
+        command.Append('"');
+        command.Append(EscapeForDoubleQuotedCurl(BuildRequestUrl(environment, endpoint)));
+        command.Append('"');
+
+        foreach (var header in endpoint.Headers.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            command.Append(" \\\n  --header \"");
+            command.Append(EscapeForDoubleQuotedCurl($"{header.Key}: {header.Value}"));
+            command.Append('"');
+        }
+
+        if (endpoint.Body is not null)
+        {
+            command.Append(" \\\n  --data \"");
+            command.Append(EscapeForDoubleQuotedCurl(System.Text.Json.JsonSerializer.Serialize(endpoint.Body, CurlJsonSerializerOptions)));
+            command.Append('"');
+        }
+
+        return command.ToString();
+    }
+
+    private static string BuildRequestUrl(EnvironmentDefinition environment, EndpointDefinition endpoint)
+    {
+        var baseUrl = environment.BaseUrl.TrimEnd('/');
+        var path = endpoint.Path.StartsWith('/') ? endpoint.Path : "/" + endpoint.Path;
+        var url = new StringBuilder(baseUrl).Append(path);
+
+        if (endpoint.Query.Count > 0)
+        {
+            url.Append('?');
+            url.Append(string.Join("&", endpoint.Query.Select(pair => $"{pair.Key}={ConvertToCurlString(pair.Value)}")));
+        }
+
+        return url.ToString();
+    }
+
+    private static string ConvertToCurlString(object? value)
+    {
+        return value switch
+        {
+            null => string.Empty,
+            string text => text,
+            bool boolean => boolean ? "true" : "false",
+            IFormattable formattable => formattable.ToString(null, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+            _ => System.Text.Json.JsonSerializer.Serialize(value, CurlJsonSerializerOptions)
+        };
+    }
+
+    private static string EscapeForDoubleQuotedCurl(string value)
+    {
+        return value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
     }
 }

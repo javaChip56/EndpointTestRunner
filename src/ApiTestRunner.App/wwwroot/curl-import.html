@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/lib/adminlte/css/adminlte.min.css" />
     <link rel="stylesheet" href="/styles.css" />
 </head>
-<body class="layout-fixed sidebar-expand-lg bg-body-tertiary app-shell">
+<body class="layout-fixed sidebar-expand-lg sidebar-mini bg-body-tertiary app-shell">
     <div class="app-wrapper">
         <nav class="app-header navbar navbar-expand bg-body">
             <div class="container-fluid">
@@ -74,8 +74,8 @@
                 <div class="container-fluid">
                     <div class="row g-4">
                         <div class="col-12">
-                            <section class="card tool-panel">
-                                <div class="card-header border-0">
+                            <section class="card card-outline card-primary tool-panel">
+                                <div class="card-header">
                                     <div class="tool-header">
                                         <div>
                                             <h2 class="panel-title"><i class="fa-solid fa-terminal panel-title-icon"></i>Paste cURL command</h2>
@@ -83,15 +83,21 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="card-body pt-0">
-                                    <textarea id="curlInput" class="tool-input" spellcheck="false" placeholder="curl --location --request POST 'https://api.example.com/accounts?customerId=C1001' --header 'Content-Type: application/json' --data '{&quot;page&quot;:1}'"></textarea>
+                                <div class="card-body">
+                                    <textarea id="curlInput" class="form-control tool-input" spellcheck="false" placeholder="curl --location --request POST 'https://api.example.com/accounts?customerId=C1001' --header 'Content-Type: application/json' --data '{&quot;page&quot;:1}'"></textarea>
+                                    <div class="editor-meta-grid mt-3">
+                                        <label class="field-stack">
+                                            <span>Endpoint name</span>
+                                            <input id="endpointNameInput" class="form-control tool-input-inline" type="text" placeholder="POST GetAccountList" />
+                                        </label>
+                                    </div>
                                 </div>
                             </section>
                         </div>
 
                         <div class="col-12">
-                            <section class="card tool-panel">
-                                <div class="card-header border-0">
+                            <section class="card card-outline card-info tool-panel">
+                                <div class="card-header">
                                     <div class="tool-header">
                                         <div>
                                             <h2 class="panel-title"><i class="fa-solid fa-code panel-title-icon"></i>Paste response body</h2>
@@ -99,45 +105,62 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="card-body pt-0">
+                                <div class="card-body">
                                     <div class="tool-actions response-preview-actions">
-                                        <button id="formatResponseButton" class="ghost-button inline-button" type="button"><i class="fa-solid fa-code button-icon"></i>Format JSON</button>
-                                        <button id="toggleResponseWrapButton" class="ghost-button inline-button" type="button"><i class="fa-solid fa-text-width button-icon"></i>Disable Wrap</button>
+                                        <button id="formatResponseButton" class="btn btn-default btn-sm" type="button"><i class="fa-solid fa-code button-icon"></i>Format JSON</button>
+                                        <button id="toggleResponseWrapButton" class="btn btn-default btn-sm" type="button"><i class="fa-solid fa-text-width button-icon"></i>Disable Wrap</button>
                                     </div>
-                                    <textarea id="responseBodyInput" class="tool-input response-preview-input is-wrapped" spellcheck="false" wrap="soft" placeholder="{&quot;statusCode&quot;:1,&quot;data&quot;:{&quot;items&quot;:[1,2,3]}}"></textarea>
+                                    <textarea id="responseBodyInput" class="form-control tool-input response-preview-input is-wrapped" spellcheck="false" wrap="soft" placeholder="{&quot;statusCode&quot;:1,&quot;data&quot;:{&quot;items&quot;:[1,2,3]}}"></textarea>
                                     <p id="responseStatus" class="result-summary mb-0">No response body parsed yet.</p>
                                 </div>
                             </section>
                         </div>
 
                         <div class="col-12">
-                            <section class="card tool-panel">
-                                <div class="card-header border-0">
+                            <section class="card card-outline card-success tool-panel">
+                                <div class="card-header">
                                     <div class="tool-header">
                                         <div>
-                                            <h2 class="panel-title"><i class="fa-solid fa-list-ul panel-title-icon"></i>Assertion builder</h2>
-                                            <p class="panel-note mb-0">Choose a response field, define the rule, and then generate the endpoint YAML preview with those assertions included.</p>
+                                            <h2 class="panel-title"><i class="fa-solid fa-list-ul panel-title-icon"></i>Test builder</h2>
+                                            <p class="panel-note mb-0">Create one or more tests, each with its own expected status and assertions, then generate endpoint YAML with all drafted tests included.</p>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="card-body pt-0">
-                                    <div class="assertion-builder-grid">
+                                <div class="card-body">
+                                    <div id="testBuilderGrid" class="assertion-builder-grid">
                                         <label class="field-stack">
-                                            <span>Field</span>
-                                            <select id="assertionFieldSelect" class="tool-select"></select>
+                                            <span>Test name</span>
+                                            <input id="testNameInput" class="form-control tool-input-inline" type="text" placeholder="Account list should return data" />
                                         </label>
                                         <label class="field-stack">
-                                            <span>Rule</span>
-                                            <select id="assertionRuleSelect" class="tool-select"></select>
-                                        </label>
-                                        <label id="assertionValueContainer" class="field-stack">
-                                            <span>Value</span>
-                                            <input id="assertionValueInput" class="tool-input-inline" type="text" />
+                                            <span>Expected status</span>
+                                            <input id="expectedStatusInput" class="form-control tool-input-inline" type="number" min="100" max="599" step="1" value="200" />
                                         </label>
                                     </div>
 
                                     <div class="tool-actions mt-3">
-                                        <button id="addAssertionButton" class="ghost-button" type="button"><i class="fa-solid fa-plus button-icon"></i>Add Assertion</button>
+                                        <button id="addTestButton" class="btn btn-default" type="button"><i class="fa-solid fa-file-circle-plus button-icon"></i>Add Another Test</button>
+                                    </div>
+
+                                    <div id="testDraftList" class="test-draft-list"></div>
+
+                                    <div id="assertionBuilderGrid" class="assertion-builder-grid">
+                                        <label class="field-stack">
+                                            <span>Field</span>
+                                            <select id="assertionFieldSelect" class="form-select tool-select"></select>
+                                        </label>
+                                        <label class="field-stack">
+                                            <span>Rule</span>
+                                            <select id="assertionRuleSelect" class="form-select tool-select"></select>
+                                        </label>
+                                        <label id="assertionValueContainer" class="field-stack">
+                                            <span>Value</span>
+                                            <input id="assertionValueInput" class="form-control tool-input-inline" type="text" />
+                                        </label>
+                                    </div>
+
+                                    <div class="tool-actions mt-3">
+                                        <button id="addAssertionButton" class="btn btn-default" type="button"><i class="fa-solid fa-plus button-icon"></i>Add Assertion</button>
                                     </div>
 
                                     <div id="assertionList" class="assertion-draft-list">
@@ -148,10 +171,11 @@
                         </div>
 
                         <div class="col-12">
-                            <section class="card tool-panel">
+                            <section class="card card-outline card-secondary tool-panel">
                                 <div class="card-body">
                                     <div class="tool-actions">
-                                        <button id="analyzeButton" class="primary-button" type="button"><i class="fa-solid fa-wand-magic-sparkles button-icon"></i>Analyze and Generate</button>
+                                        <button id="analyzeButton" class="btn btn-primary elevation-2" type="button"><i class="fa-solid fa-wand-magic-sparkles button-icon"></i>Analyze and Generate</button>
+                                        <button id="saveEndpointButton" class="btn btn-default" type="button"><i class="fa-solid fa-floppy-disk button-icon"></i>Save Endpoint YAML</button>
                                         <span id="analyzeStatus" class="result-summary">Waiting for input.</span>
                                     </div>
                                 </div>

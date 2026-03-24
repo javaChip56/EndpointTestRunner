@@ -90,6 +90,7 @@ The main dashboard now exposes a test-selection panel before execution:
 - The results view also has live search for APIs, endpoints, tests, assertions, and error text.
 - Matching text is highlighted in both selection and result sections to make hits easier to spot.
 - Environment, endpoint, and individual test checkboxes let you run only the subset you care about.
+- Each endpoint row in test selection also exposes an `Edit endpoint` action that opens the cURL import page preloaded with that endpoint's current request and tests.
 - Each page load starts with all tests selected by default.
 - The dashboard and cURL import pages use local AdminLTE assets, so the UI does not rely on external CDNs at runtime.
 
@@ -112,7 +113,9 @@ The tool will:
 
 - parse the request URL, method, headers, query string, and JSON body
 - optionally parse a pasted JSON response body in the same flow so the assertion builder stays on the same page
-- let you add assertion drafts first, then use the main `Analyze and Generate` action to include them in the endpoint YAML preview
+- let you create multiple drafted tests, each with its own expected status and assertion set, then use `Analyze and Generate` to include all of them in the endpoint YAML preview
+- open directly from the dashboard's `Edit endpoint` action so existing endpoint requests and tests can be adjusted in the importer flow
+- save an edited endpoint back to its owning endpoint YAML file with `Save Endpoint YAML`
 - scan the configured YAML suite for an existing environment whose `baseUrl` already covers the pasted request URL
 - scan for an existing endpoint with the same method and either the same relative path or a matching path template such as `/customers/{customerId}`
 - generate suggested environment YAML when the base URL is not already present
@@ -125,7 +128,9 @@ Current first-version scope:
 
 - best support is for common `curl`, `-X`, `-H`, `--data`, `--data-raw`, `--data-binary`, and `--url` forms
 - the page now uses one main `Analyze and Generate` action instead of separate request-analysis and response-parse steps
+- each drafted test in the cURL page keeps its own assertions, so you can generate multiple YAML tests for one endpoint in a single pass
 - generated YAML is shown as preview text, not written directly to disk
+- when editing an existing endpoint from the dashboard, the cURL importer can now write the updated endpoint back to its original YAML file
 - the assertion builder currently targets the most common field assertions: `equals`, `notEquals`, `type`, `containsText`, `startsWith`, `endsWith`, `notEmpty`, `greaterThan`, `greaterThanOrEqual`, `lessThan`, `lessThanOrEqual`, `minCount`, `maxCount`, and `count`
 - missing YAML warnings are surfaced in the cURL import UI, but malformed YAML content still needs to be fixed before the dashboard runner can execute the suite
 
@@ -299,6 +304,12 @@ assertions:
 
   - field: data.accounts
     contains:
+      status: Active
+
+  - field: data.accounts
+    contains:
+      portfolioValue:
+        greaterThan: 1000
       status: Active
 ```
 

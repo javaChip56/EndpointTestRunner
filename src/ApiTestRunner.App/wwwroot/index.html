@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/lib/adminlte/css/adminlte.min.css" />
     <link rel="stylesheet" href="/styles.css" />
 </head>
-<body class="layout-fixed sidebar-expand-lg bg-body-tertiary app-shell">
+<body class="layout-fixed sidebar-expand-lg sidebar-mini bg-body-tertiary app-shell">
     <div class="app-wrapper">
         <nav class="app-header navbar navbar-expand bg-body">
             <div class="container-fluid">
@@ -23,8 +23,8 @@
                     </li>
                 </ul>
                 <div class="ms-auto d-flex flex-wrap gap-2">
-                    <button id="runButton" class="primary-button" type="button"><i class="fa-solid fa-play button-icon"></i>Run Tests</button>
-                    <button id="refreshButton" class="ghost-button" type="button"><i class="fa-solid fa-rotate-right button-icon"></i>Refresh</button>
+                    <button id="runButton" class="btn btn-primary elevation-2" type="button"><i class="fa-solid fa-play button-icon"></i>Run Tests</button>
+                    <button id="refreshButton" class="btn btn-default" type="button"><i class="fa-solid fa-rotate-right button-icon"></i>Refresh</button>
                 </div>
             </div>
         </nav>
@@ -78,61 +78,53 @@
                 <div class="container-fluid">
                     <div class="row g-4">
                         <div class="col-6 col-xl-3">
-                            <section class="card metric-card metric-card-total">
-                                <div class="card-body metric-card-body">
-                                    <div>
-                                        <strong id="totalTests" class="metric-value">-</strong>
-                                        <span class="metric-label">Total tests</span>
-                                    </div>
-                                    <span class="metric-icon" aria-hidden="true">
-                                        <i class="fa-solid fa-flask-vial"></i>
-                                    </span>
+                            <section class="small-box text-bg-primary metric-box">
+                                <div class="inner">
+                                    <h3 id="totalTests" class="metric-value">-</h3>
+                                    <p class="metric-label">Total tests</p>
+                                </div>
+                                <div class="icon" aria-hidden="true">
+                                    <i class="fa-solid fa-flask-vial"></i>
                                 </div>
                             </section>
                         </div>
                         <div class="col-6 col-xl-3">
-                            <section class="card metric-card metric-card-pass">
-                                <div class="card-body metric-card-body">
-                                    <div>
-                                        <strong id="passedTests" class="metric-value">-</strong>
-                                        <span class="metric-label">Passed</span>
-                                    </div>
-                                    <span class="metric-icon" aria-hidden="true">
-                                        <i class="fa-solid fa-circle-check"></i>
-                                    </span>
+                            <section class="small-box text-bg-success metric-box">
+                                <div class="inner">
+                                    <h3 id="passedTests" class="metric-value">-</h3>
+                                    <p class="metric-label">Passed</p>
+                                </div>
+                                <div class="icon" aria-hidden="true">
+                                    <i class="fa-solid fa-circle-check"></i>
                                 </div>
                             </section>
                         </div>
                         <div class="col-6 col-xl-3">
-                            <section class="card metric-card metric-card-fail">
-                                <div class="card-body metric-card-body">
-                                    <div>
-                                        <strong id="failedTests" class="metric-value">-</strong>
-                                        <span class="metric-label">Failed</span>
-                                    </div>
-                                    <span class="metric-icon" aria-hidden="true">
-                                        <i class="fa-solid fa-triangle-exclamation"></i>
-                                    </span>
+                            <section class="small-box text-bg-danger metric-box">
+                                <div class="inner">
+                                    <h3 id="failedTests" class="metric-value">-</h3>
+                                    <p class="metric-label">Failed</p>
+                                </div>
+                                <div class="icon" aria-hidden="true">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
                                 </div>
                             </section>
                         </div>
                         <div class="col-6 col-xl-3">
-                            <section class="card metric-card metric-card-duration">
-                                <div class="card-body metric-card-body">
-                                    <div>
-                                        <strong id="totalDuration" class="metric-value">-</strong>
-                                        <span class="metric-label">Duration</span>
-                                    </div>
-                                    <span class="metric-icon" aria-hidden="true">
-                                        <i class="fa-solid fa-stopwatch"></i>
-                                    </span>
+                            <section class="small-box text-bg-warning metric-box metric-box-warning">
+                                <div class="inner">
+                                    <h3 id="totalDuration" class="metric-value">-</h3>
+                                    <p class="metric-label">Duration</p>
+                                </div>
+                                <div class="icon" aria-hidden="true">
+                                    <i class="fa-solid fa-stopwatch"></i>
                                 </div>
                             </section>
                         </div>
 
                         <div class="col-12">
-                            <section class="card status-panel">
-                                <div class="card-header border-0">
+                            <section class="card card-outline card-primary status-panel">
+                                <div class="card-header">
                                     <div>
                                         <h2 class="panel-title"><i class="fa-solid fa-signal panel-title-icon"></i>Run status</h2>
                                         <p id="runStatus" class="panel-note mb-0">Waiting for the first test run.</p>
@@ -148,27 +140,25 @@
                         </div>
 
                         <div class="col-12">
-                            <section class="card selection-panel">
-                                <div class="card-header border-0">
+                            <section class="card card-outline card-success selection-panel">
+                                <div class="card-header">
                                     <div class="selection-header">
                                         <div>
                                             <h2 class="panel-title"><i class="fa-solid fa-list-check panel-title-icon"></i>Test selection</h2>
                                             <p id="selectionSummary" class="panel-note mb-0">Loading test manifest...</p>
                                         </div>
                                         <div class="selection-actions">
-                                            <button id="selectAllButton" class="ghost-button" type="button"><i class="fa-solid fa-check-double button-icon"></i>Select All</button>
-                                            <button id="clearAllButton" class="ghost-button" type="button"><i class="fa-solid fa-eraser button-icon"></i>Clear All</button>
-                                            <button id="expandSelectionButton" class="ghost-button" type="button"><i class="fa-solid fa-up-right-and-down-left-from-center button-icon"></i>Expand All</button>
-                                            <button id="collapseSelectionButton" class="ghost-button" type="button"><i class="fa-solid fa-down-left-and-up-right-to-center button-icon"></i>Collapse All</button>
+                                            <button id="selectAllButton" class="btn btn-default btn-sm" type="button"><i class="fa-solid fa-check-double button-icon"></i>Select All</button>
+                                            <button id="clearAllButton" class="btn btn-default btn-sm" type="button"><i class="fa-solid fa-eraser button-icon"></i>Clear All</button>
+                                            <button id="expandSelectionButton" class="btn btn-default btn-sm" type="button"><i class="fa-solid fa-up-right-and-down-left-from-center button-icon"></i>Expand All</button>
+                                            <button id="collapseSelectionButton" class="btn btn-default btn-sm" type="button"><i class="fa-solid fa-down-left-and-up-right-to-center button-icon"></i>Collapse All</button>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="card-body pt-0">
-                                    <div class="selection-search-row">
-                                        <label class="selection-search-input" for="selectionSearchInput">
-                                            <i class="fa-solid fa-magnifying-glass"></i>
-                                            <input id="selectionSearchInput" type="search" placeholder="Search APIs, base URLs, endpoints, methods, or tests" autocomplete="off" />
-                                        </label>
+                                <div class="card-body">
+                                    <div class="input-group input-group-lg selection-search-row">
+                                        <span class="input-group-text"><i class="fa-solid fa-magnifying-glass"></i></span>
+                                        <input id="selectionSearchInput" class="form-control" type="search" placeholder="Search APIs, base URLs, endpoints, methods, or tests" autocomplete="off" />
                                     </div>
                                     <div id="selectionContainer" class="selection-tree"></div>
                                 </div>
@@ -176,28 +166,26 @@
                         </div>
 
                         <div class="col-12">
-                            <section class="card results-panel">
-                                <div class="card-header border-0">
+                            <section class="card card-outline card-info results-panel">
+                                <div class="card-header">
                                     <div class="selection-header">
                                         <div>
                                             <h2 class="panel-title"><i class="fa-solid fa-wave-square panel-title-icon"></i>Test results</h2>
                                             <p id="resultsSummary" class="panel-note mb-0">Use the controls to expand or collapse the latest results.</p>
                                         </div>
                                         <div class="selection-actions">
-                                            <button id="showAllResultsButton" class="ghost-button" type="button"><i class="fa-solid fa-layer-group button-icon"></i>Show All</button>
-                                            <button id="showPassingResultsButton" class="ghost-button" type="button"><i class="fa-solid fa-circle-check button-icon"></i>Show Pass</button>
-                                            <button id="showFailingResultsButton" class="ghost-button" type="button"><i class="fa-solid fa-triangle-exclamation button-icon"></i>Show Fail</button>
-                                            <button id="expandResultsButton" class="ghost-button" type="button"><i class="fa-solid fa-up-right-and-down-left-from-center button-icon"></i>Expand All</button>
-                                            <button id="collapseResultsButton" class="ghost-button" type="button"><i class="fa-solid fa-down-left-and-up-right-to-center button-icon"></i>Collapse All</button>
+                                            <button id="showAllResultsButton" class="btn btn-default btn-sm" type="button"><i class="fa-solid fa-layer-group button-icon"></i>Show All</button>
+                                            <button id="showPassingResultsButton" class="btn btn-default btn-sm" type="button"><i class="fa-solid fa-circle-check button-icon"></i>Show Pass</button>
+                                            <button id="showFailingResultsButton" class="btn btn-default btn-sm" type="button"><i class="fa-solid fa-triangle-exclamation button-icon"></i>Show Fail</button>
+                                            <button id="expandResultsButton" class="btn btn-default btn-sm" type="button"><i class="fa-solid fa-up-right-and-down-left-from-center button-icon"></i>Expand All</button>
+                                            <button id="collapseResultsButton" class="btn btn-default btn-sm" type="button"><i class="fa-solid fa-down-left-and-up-right-to-center button-icon"></i>Collapse All</button>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="card-body pt-0">
-                                    <div class="selection-search-row">
-                                        <label class="selection-search-input" for="resultsSearchInput">
-                                            <i class="fa-solid fa-magnifying-glass"></i>
-                                            <input id="resultsSearchInput" type="search" placeholder="Search results by API, endpoint, method, test, assertion, or error text" autocomplete="off" />
-                                        </label>
+                                <div class="card-body">
+                                    <div class="input-group input-group-lg selection-search-row">
+                                        <span class="input-group-text"><i class="fa-solid fa-magnifying-glass"></i></span>
+                                        <input id="resultsSearchInput" class="form-control" type="search" placeholder="Search results by API, endpoint, method, test, assertion, or error text" autocomplete="off" />
                                     </div>
                                     <section id="environmentContainer" class="environment-container"></section>
                                 </div>
@@ -210,7 +198,7 @@
     </div>
 
     <template id="environmentTemplate">
-        <details class="card environment-card">
+        <details class="card card-outline card-primary environment-card">
             <summary class="card-header environment-summary-row">
                 <header class="environment-header">
                     <div>
@@ -228,7 +216,7 @@
     </template>
 
     <template id="endpointTemplate">
-        <details class="card endpoint-card">
+        <details class="card card-outline card-info endpoint-card">
             <summary class="card-header endpoint-summary-row">
                 <header class="endpoint-header">
                     <div>
@@ -240,14 +228,14 @@
             </summary>
             <div class="card-body endpoint-details">
                 <div class="test-list"></div>
-                <details class="response-panel">
-                    <summary>Response preview</summary>
-                    <div class="response-panel-body">
+                <details class="card card-outline card-secondary response-panel">
+                    <summary class="card-header">Response preview</summary>
+                    <div class="card-body response-panel-body">
                         <div class="tool-actions response-preview-actions">
-                            <button class="ghost-button inline-button format-response-button" type="button"><i class="fa-solid fa-code button-icon"></i>Format JSON</button>
-                            <button class="ghost-button inline-button toggle-response-wrap-button" type="button"><i class="fa-solid fa-text-width button-icon"></i>Disable Wrap</button>
+                            <button class="btn btn-default btn-sm format-response-button" type="button"><i class="fa-solid fa-code button-icon"></i>Format JSON</button>
+                            <button class="btn btn-default btn-sm toggle-response-wrap-button" type="button"><i class="fa-solid fa-text-width button-icon"></i>Disable Wrap</button>
                         </div>
-                        <textarea class="response-body response-preview-input is-wrapped" readonly wrap="soft"></textarea>
+                        <textarea class="form-control response-body response-preview-input is-wrapped" readonly wrap="soft"></textarea>
                     </div>
                 </details>
             </div>
@@ -255,7 +243,7 @@
     </template>
 
     <template id="testTemplate">
-        <details class="card test-card">
+        <details class="card card-outline card-secondary test-card">
             <summary class="card-header test-summary-row">
                 <div class="test-title-row">
                     <strong class="test-name"></strong>

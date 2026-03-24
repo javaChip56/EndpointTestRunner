@@ -45,18 +45,11 @@ public sealed class CurlCommandAnalyzerTests
         Assert.Equal("matched", result.Environment.MatchStatus);
         Assert.Equal("matched", result.Endpoint.MatchStatus);
         Assert.Contains("Uat", result.Endpoint.MatchedEnvironmentNames);
-        Assert.NotNull(result.Environment.CurrentYaml);
-        Assert.NotNull(result.Environment.SuggestedYaml);
-        Assert.NotNull(result.Environment.DiffYaml);
-        Assert.NotNull(result.Endpoint.CurrentYaml);
-        Assert.NotNull(result.Endpoint.SuggestedYaml);
-        Assert.NotNull(result.Endpoint.DiffYaml);
-        Assert.Contains("name: \"Uat\"", result.Environment.SuggestedYaml);
-        Assert.Contains("path: \"/customers/{customerId}\"", result.Endpoint.SuggestedYaml);
-        Assert.Contains("name: \"Get Customer Details\"", result.Endpoint.SuggestedYaml);
-        Assert.Contains("  - name: \"Uat\"", result.Environment.DiffYaml);
-        Assert.Contains("+", result.Endpoint.DiffYaml);
-        Assert.Contains("Get Customer Details should return success", result.Endpoint.DiffYaml);
+        Assert.Contains(result.Environment.MatchedYamlPreviews, preview => preview.Title == "Uat" && preview.Yaml.Contains("baseUrl: \"https://api.example.com\""));
+        Assert.Contains(result.Endpoint.MatchedYamlPreviews, preview => preview.Title == "Uat - Get Customer Details" && preview.Yaml.Contains("path: \"/customers/{customerId}\""));
+        Assert.NotNull(result.Endpoint.GeneratedYaml);
+        Assert.Contains("path: \"/customers/C1001\"", result.Endpoint.GeneratedYaml);
+        Assert.Null(result.Endpoint.SuggestedYaml);
     }
 
     [Fact]
@@ -82,11 +75,8 @@ public sealed class CurlCommandAnalyzerTests
         Assert.True(result.Environment.Exists);
         Assert.Equal("matched", result.Environment.MatchStatus);
         Assert.Contains("PartnerUat", result.Environment.MatchedEnvironmentNames);
-        Assert.NotNull(result.Environment.CurrentYaml);
-        Assert.NotNull(result.Environment.SuggestedYaml);
-        Assert.NotNull(result.Environment.DiffYaml);
-        Assert.Contains("name: \"PartnerUat\"", result.Environment.SuggestedYaml);
-        Assert.Contains("baseUrl: \"https://api.partner.com/AccountHoldingsMgmt\"", result.Environment.SuggestedYaml);
+        Assert.Contains(result.Environment.MatchedYamlPreviews, preview => preview.Title == "PartnerUat" && preview.Yaml.Contains("baseUrl: \"https://api.partner.com/AccountHoldingsMgmt\""));
+        Assert.Null(result.Environment.SuggestedYaml);
         Assert.Equal("/GetAccountList", result.Request?.RelativePath);
     }
 
@@ -129,6 +119,65 @@ public sealed class CurlCommandAnalyzerTests
     }
 
     [Fact]
+    public async Task AnalyzeAsync_UsesCurrentEditorEnvironmentWhenProvided()
+    {
+        var local = new EnvironmentDefinition
+        {
+            Name = "Local",
+            BaseUrl = "https://api.example.com"
+        };
+        var localCanary = new EnvironmentDefinition
+        {
+            Name = "Local Canary",
+            BaseUrl = "https://api.example.com"
+        };
+
+        var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
+        {
+            Environments = [local, localCanary]
+        }));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            EnvironmentId = DashboardSuiteManifestFactory.CreateEnvironmentId(local),
+            Command = "curl --request GET \"https://api.example.com/accounts\"",
+            EndpointName = "Get Accounts"
+        });
+
+        Assert.NotNull(result.Endpoint.GeneratedYaml);
+        Assert.Contains("- \"Local\"", result.Endpoint.GeneratedYaml);
+        Assert.DoesNotContain("Local Canary", result.Endpoint.GeneratedYaml);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_DecodesEncodedRoutePlaceholdersInGeneratedYaml()
+    {
+        var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
+        {
+            Environments =
+            [
+                new EnvironmentDefinition
+                {
+                    Name = "Local",
+                    BaseUrl = "https://api.example.com"
+                }
+            ]
+        }));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            Command = "curl --request GET \"https://api.example.com/sample-api/customers/%7BcustomerId%7D\"",
+            EndpointName = "Get Customer Details"
+        });
+
+        Assert.NotNull(result.Request);
+        Assert.Equal("/sample-api/customers/{customerId}", result.Request.RelativePath);
+        Assert.NotNull(result.Endpoint.GeneratedYaml);
+        Assert.Contains("path: \"/sample-api/customers/{customerId}\"", result.Endpoint.GeneratedYaml);
+        Assert.DoesNotContain("%7BcustomerId%7D", result.Endpoint.GeneratedYaml);
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_IncludesSelectedAssertionsInGeneratedYaml()
     {
         var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
@@ -168,6 +217,57 @@ public sealed class CurlCommandAnalyzerTests
         Assert.Contains("field: \"data.pagenationTemplate.dataLists\"", result.Endpoint.SuggestedYaml);
         Assert.Contains("minCount: 1", result.Endpoint.SuggestedYaml);
         Assert.Contains("notEmpty: true", result.Endpoint.SuggestedYaml);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_GeneratesMultipleTestsWithSeparateAssertions()
+    {
+        var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
+        {
+            Environments = []
+        }));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            Command = "curl --request POST \"https://api.partner.com/AccountHoldingsMgmt/GetAccountList\"",
+            Tests =
+            [
+                new CurlTestDraft
+                {
+                    Name = "Account list should return data",
+                    ExpectedStatus = 200,
+                    Assertions =
+                    [
+                        new CurlAssertionDraft
+                        {
+                            Field = "statusCode",
+                            Rule = "equals",
+                            Value = 1
+                        }
+                    ]
+                },
+                new CurlTestDraft
+                {
+                    Name = "Account list should include rows",
+                    ExpectedStatus = 200,
+                    Assertions =
+                    [
+                        new CurlAssertionDraft
+                        {
+                            Field = "data.pagenationTemplate.dataLists",
+                            Rule = "minCount",
+                            Value = 1
+                        }
+                    ]
+                }
+            ]
+        });
+
+        Assert.NotNull(result.Endpoint.SuggestedYaml);
+        Assert.Contains("- name: \"Account list should return data\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("- name: \"Account list should include rows\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("field: \"statusCode\"", result.Endpoint.SuggestedYaml);
+        Assert.Contains("field: \"data.pagenationTemplate.dataLists\"", result.Endpoint.SuggestedYaml);
     }
 
     [Fact]

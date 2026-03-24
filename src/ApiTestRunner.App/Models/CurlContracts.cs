@@ -4,7 +4,13 @@ public sealed class CurlAnalyzeRequest
 {
     public string Command { get; init; } = string.Empty;
 
+    public string? EnvironmentId { get; init; }
+
+    public string? EndpointName { get; init; }
+
     public string? ResponseBody { get; init; }
+
+    public IReadOnlyList<CurlTestDraft> Tests { get; init; } = [];
 
     public IReadOnlyList<CurlAssertionDraft> Assertions { get; init; } = [];
 }
@@ -52,6 +58,15 @@ public sealed class CurlAssertionDraft
     public object? Value { get; init; }
 }
 
+public sealed class CurlTestDraft
+{
+    public string Name { get; init; } = string.Empty;
+
+    public int ExpectedStatus { get; init; } = 200;
+
+    public IReadOnlyList<CurlAssertionDraft> Assertions { get; init; } = [];
+}
+
 public sealed class CurlEnvironmentAnalysis
 {
     public bool Exists { get; init; }
@@ -62,7 +77,7 @@ public sealed class CurlEnvironmentAnalysis
 
     public IReadOnlyList<string> MatchedEnvironmentNames { get; init; } = [];
 
-    public IReadOnlyList<CurlEnvironmentCandidate> Candidates { get; init; } = [];
+    public IReadOnlyList<CurlYamlPreview> MatchedYamlPreviews { get; init; } = [];
 
     public string? SuggestedFilePath { get; init; }
 
@@ -71,6 +86,8 @@ public sealed class CurlEnvironmentAnalysis
     public string? SuggestedYaml { get; init; }
 
     public string? DiffYaml { get; init; }
+
+    public IReadOnlyList<CurlEnvironmentCandidate> Candidates { get; init; } = [];
 }
 
 public sealed class CurlEndpointAnalysis
@@ -83,7 +100,9 @@ public sealed class CurlEndpointAnalysis
 
     public IReadOnlyList<string> MatchedEnvironmentNames { get; init; } = [];
 
-    public IReadOnlyList<CurlEndpointCandidate> Candidates { get; init; } = [];
+    public IReadOnlyList<CurlYamlPreview> MatchedYamlPreviews { get; init; } = [];
+
+    public string? GeneratedYaml { get; init; }
 
     public string? SuggestedFilePath { get; init; }
 
@@ -92,6 +111,15 @@ public sealed class CurlEndpointAnalysis
     public string? SuggestedYaml { get; init; }
 
     public string? DiffYaml { get; init; }
+
+    public IReadOnlyList<CurlEndpointCandidate> Candidates { get; init; } = [];
+}
+
+public sealed class CurlYamlPreview
+{
+    public string Title { get; init; } = string.Empty;
+
+    public string Yaml { get; init; } = string.Empty;
 }
 
 public sealed class CurlVariableAnalysis

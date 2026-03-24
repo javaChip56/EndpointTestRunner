@@ -9,6 +9,7 @@ namespace ApiTestRunner.App.Services;
 public sealed class TestRunCoordinator
 {
     private readonly IConfiguredTestSuiteProvider _suiteProvider;
+    private readonly DashboardEndpointEditorService _endpointEditorService;
     private readonly IApiTestExecutor _executor;
     private readonly IOptions<ExecutionOptions> _executionOptions;
     private readonly ILogger<TestRunCoordinator> _logger;
@@ -18,11 +19,13 @@ public sealed class TestRunCoordinator
 
     public TestRunCoordinator(
         IConfiguredTestSuiteProvider suiteProvider,
+        DashboardEndpointEditorService endpointEditorService,
         IApiTestExecutor executor,
         IOptions<ExecutionOptions> executionOptions,
         ILogger<TestRunCoordinator> logger)
     {
         _suiteProvider = suiteProvider;
+        _endpointEditorService = endpointEditorService;
         _executor = executor;
         _executionOptions = executionOptions;
         _logger = logger;
@@ -37,6 +40,21 @@ public sealed class TestRunCoordinator
     {
         var loadedSuite = await _suiteProvider.LoadAsync(cancellationToken);
         return DashboardSuiteManifestFactory.Create(loadedSuite.Suite);
+    }
+
+    public async Task<DashboardEndpointEditorSeed> GetEditorSeedAsync(
+        string environmentId,
+        string endpointId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _endpointEditorService.GetEditorSeedAsync(environmentId, endpointId, cancellationToken);
+    }
+
+    public async Task<DashboardEndpointSaveResponse> SaveEditorAsync(
+        DashboardEndpointSaveRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return await _endpointEditorService.SaveAsync(request, cancellationToken);
     }
 
     public async Task<DashboardState> ExecuteAsync(
