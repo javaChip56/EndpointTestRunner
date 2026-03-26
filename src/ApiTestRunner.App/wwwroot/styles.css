@@ -362,6 +362,25 @@ body.app-shell {
     padding: 1rem 3rem 1rem 1.1rem;
 }
 
+.preview-card-heading {
+    display: grid;
+    gap: 0.22rem;
+}
+
+.preview-card-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.preview-card-note {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: #667085;
+}
+
 .selection-summary-row::after,
 .environment-summary-row::after,
 .endpoint-summary-row::after,

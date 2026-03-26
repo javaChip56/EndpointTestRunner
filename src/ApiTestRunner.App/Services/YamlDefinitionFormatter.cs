@@ -57,7 +57,10 @@ internal static class YamlDefinitionFormatter
             ["baseUrl"] = environment.BaseUrl,
             ["variables"] = environment.Variables.Count == 0
                 ? null
-                : new Dictionary<string, object?>(environment.Variables, StringComparer.OrdinalIgnoreCase),
+                : environment.Variables.ToDictionary(
+                    pair => pair.Key,
+                    pair => NormalizeForYamlValue(pair.Value),
+                    StringComparer.OrdinalIgnoreCase),
             ["endpoints"] = environment.Endpoints.Count == 0
                 ? null
                 : environment.Endpoints.Select(BuildEndpointDocument).Cast<object?>().ToArray()
@@ -75,12 +78,18 @@ internal static class YamlDefinitionFormatter
 
         if (endpoint.PathParams.Count > 0)
         {
-            document["pathParams"] = new Dictionary<string, object?>(endpoint.PathParams, StringComparer.OrdinalIgnoreCase);
+            document["pathParams"] = endpoint.PathParams.ToDictionary(
+                pair => pair.Key,
+                pair => NormalizeForYamlValue(pair.Value),
+                StringComparer.OrdinalIgnoreCase);
         }
 
         if (endpoint.Query.Count > 0)
         {
-            document["query"] = new Dictionary<string, object?>(endpoint.Query, StringComparer.OrdinalIgnoreCase);
+            document["query"] = endpoint.Query.ToDictionary(
+                pair => pair.Key,
+                pair => NormalizeForYamlValue(pair.Value),
+                StringComparer.OrdinalIgnoreCase);
         }
 
         if (endpoint.Headers.Count > 0)
@@ -93,7 +102,7 @@ internal static class YamlDefinitionFormatter
 
         if (endpoint.Body is not null)
         {
-            document["body"] = endpoint.Body;
+            document["body"] = NormalizeForYamlValue(endpoint.Body);
         }
 
         if (endpoint.Tests.Count > 0)
@@ -144,7 +153,10 @@ internal static class YamlDefinitionFormatter
 
         if (assertion.Contains.Count > 0)
         {
-            document["contains"] = new Dictionary<string, object?>(assertion.Contains, StringComparer.OrdinalIgnoreCase);
+            document["contains"] = assertion.Contains.ToDictionary(
+                pair => pair.Key,
+                pair => NormalizeForYamlValue(pair.Value),
+                StringComparer.OrdinalIgnoreCase);
         }
 
         return document;
@@ -154,8 +166,142 @@ internal static class YamlDefinitionFormatter
     {
         if (value is not null)
         {
-            document[key] = value;
+            document[key] = NormalizeForYamlValue(value);
         }
+    }
+
+    public static object? NormalizeForYamlValue(object? value)
+    {
+        return value switch
+        {
+            null => null,
+            string or bool or byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal => value,
+            IDictionary<string, object?> dictionary => dictionary.ToDictionary(
+                pair => pair.Key,
+                pair => NormalizeForYamlValue(pair.Value),
+                StringComparer.OrdinalIgnoreCase),
+            IDictionary dictionary => NormalizeNonGenericDictionary(dictionary),
+            IEnumerable sequence when value is not string => NormalizeEnumerable(sequence),
+            _ => value
+        };
+    }
+
+    private static Dictionary<string, object?> NormalizeNonGenericDictionary(IDictionary dictionary)
+    {
+        var normalized = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (DictionaryEntry entry in dictionary)
+        {
+            var key = Convert.ToString(entry.Key, CultureInfo.InvariantCulture);
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                continue;
+            }
+
+            normalized[key] = NormalizeForYamlValue(entry.Value);
+        }
+
+        return normalized;
+    }
+
+    private static object NormalizeEnumerable(IEnumerable sequence)
+    {
+        var items = sequence.Cast<object?>().ToArray();
+
+        if (TryNormalizeKeyValuePairSequence(items, out var dictionary))
+        {
+            return dictionary;
+        }
+
+        return items
+            .Select(NormalizeForYamlValue)
+            .ToList();
+    }
+
+    private static bool TryNormalizeKeyValuePairSequence(
+        IReadOnlyList<object?> items,
+        out Dictionary<string, object?> dictionary)
+    {
+        dictionary = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        if (items.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var item in items)
+        {
+            if (!TryReadKeyValuePair(item, out var key, out var value))
+            {
+                dictionary = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                return false;
+            }
+
+            dictionary[key] = NormalizeForYamlValue(value);
+        }
+
+        return true;
+    }
+
+    private static bool TryReadKeyValuePair(object? item, out string key, out object? value)
+    {
+        key = string.Empty;
+        value = null;
+
+        if (item is null)
+        {
+            return false;
+        }
+
+        if (item is DictionaryEntry dictionaryEntry)
+        {
+            key = Convert.ToString(dictionaryEntry.Key, CultureInfo.InvariantCulture) ?? string.Empty;
+            value = dictionaryEntry.Value;
+            return !string.IsNullOrWhiteSpace(key);
+        }
+
+        if (TryReadTupleStylePair(item, out key, out value))
+        {
+            return true;
+        }
+
+        var type = item.GetType();
+        if (!type.IsGenericType || type.GetGenericTypeDefinition() != typeof(KeyValuePair<,>))
+        {
+            return false;
+        }
+
+        var keyProperty = type.GetProperty("Key");
+        var valueProperty = type.GetProperty("Value");
+        if (keyProperty is null || valueProperty is null)
+        {
+            return false;
+        }
+
+        key = Convert.ToString(keyProperty.GetValue(item), CultureInfo.InvariantCulture) ?? string.Empty;
+        value = valueProperty.GetValue(item);
+        return !string.IsNullOrWhiteSpace(key);
+    }
+
+    private static bool TryReadTupleStylePair(object item, out string key, out object? value)
+    {
+        key = string.Empty;
+        value = null;
+
+        if (item is string || item is not IEnumerable sequence)
+        {
+            return false;
+        }
+
+        var values = sequence.Cast<object?>().ToArray();
+        if (values.Length != 2)
+        {
+            return false;
+        }
+
+        key = Convert.ToString(values[0], CultureInfo.InvariantCulture) ?? string.Empty;
+        value = values[1];
+        return !string.IsNullOrWhiteSpace(key);
     }
 
     private static YamlNode BuildYamlNode(object? value, bool isKey)

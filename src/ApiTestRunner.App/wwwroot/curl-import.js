@@ -1628,7 +1628,7 @@ function createCard(title, summary) {
 
     const header = document.createElement("summary");
     header.className = "card-header preview-card-summary";
-    header.innerHTML = `<div><h2 class="card-title">${escapeHtml(title)}</h2><p class="result-note mb-0">${escapeHtml(summary)}</p></div>`;
+    header.innerHTML = `<div class="preview-card-heading"><h2 class="card-title preview-card-title">${escapeHtml(title)}</h2><p class="preview-card-note">${escapeHtml(summary)}</p></div>`;
 
     const body = document.createElement("div");
     body.className = "card-body preview-card-body";

@@ -137,4 +137,51 @@ public sealed class DashboardSuiteManifestFactoryTests
         Assert.Contains(test.Assertions, assertion => assertion.Rule == "minCount");
         Assert.Contains(test.Assertions, assertion => assertion.Rule == "contains");
     }
+
+    [Fact]
+    public void CreateEditorSeed_SerializesEmptyArraysInBodyAsJsonArrays()
+    {
+        var suite = new ApiTestSuiteDefinition
+        {
+            Environments =
+            [
+                new EnvironmentDefinition
+                {
+                    Name = "Local",
+                    BaseUrl = "https://localhost:5005",
+                    Endpoints =
+                    [
+                        new EndpointDefinition
+                        {
+                            Name = "Get Summary",
+                            Method = "POST",
+                            Path = "/api/summary",
+                            Body = new Dictionary<object, object?>
+                            {
+                                ["searches"] = new List<object?>(),
+                                ["ranges"] = new List<object?>()
+                            },
+                            Tests =
+                            [
+                                new TestDefinition { Name = "Summary should load", ExpectedStatus = 200 }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        };
+
+        var environment = suite.Environments[0];
+        var endpoint = environment.Endpoints[0];
+
+        var seed = DashboardSuiteManifestFactory.CreateEditorSeed(
+            suite,
+            DashboardSuiteManifestFactory.CreateEnvironmentId(environment),
+            DashboardSuiteManifestFactory.CreateEndpointId(environment, endpoint));
+
+        Assert.NotNull(seed);
+        Assert.Contains("\\\"searches\\\":[]", seed.CurlCommand);
+        Assert.Contains("\\\"ranges\\\":[]", seed.CurlCommand);
+        Assert.DoesNotContain("System.Collections.Generic.List", seed.CurlCommand);
+    }
 }

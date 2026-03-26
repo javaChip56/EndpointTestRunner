@@ -1,0 +1,16 @@
+environments:
+- name: "AdvisorDashboard"
+  baseUrl: "http://10.30.23.166:8072"
+  variables:
+    userID: "232705"
+    roleId: "106"
+    baseCurrency: "SGD"
+    isOnlyGWMDB: "true"
+    currentPageNumber: 1
+    recordsPerPage: 10
+    valuationMonth: "3"
+    valuationYear: "2026"
+    userRoleID: "106"
+    sort: "accountType"
+    sortOrder: "asc"
+...
