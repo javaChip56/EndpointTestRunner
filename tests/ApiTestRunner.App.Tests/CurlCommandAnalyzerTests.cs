@@ -178,6 +178,50 @@ public sealed class CurlCommandAnalyzerTests
     }
 
     [Fact]
+    public async Task AnalyzeAsync_NormalizesMatchedEndpointPreviewBodyShape()
+    {
+        var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition
+        {
+            Environments =
+            [
+                new EnvironmentDefinition
+                {
+                    Name = "Local",
+                    BaseUrl = "https://api.example.com",
+                    Endpoints =
+                    [
+                        new EndpointDefinition
+                        {
+                            Name = "Get Pair List",
+                            Method = "POST",
+                            Path = "/pair-list",
+                            Body = new object?[]
+                            {
+                                new object?[] { "filters", new List<object?>() },
+                                new object?[] { "ranges", new List<object?>() }
+                            },
+                            Tests =
+                            [
+                                new TestDefinition { Name = "Returns data", ExpectedStatus = 200 }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }));
+
+        var result = await analyzer.AnalyzeAsync(new CurlAnalyzeRequest
+        {
+            Command = "curl --request POST \"https://api.example.com/pair-list\""
+        });
+
+        var preview = Assert.Single(result.Endpoint.MatchedYamlPreviews);
+        Assert.Contains("filters: []", preview.Yaml);
+        Assert.Contains("ranges: []", preview.Yaml);
+        Assert.DoesNotContain("System.Collections.Generic.List", preview.Yaml);
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_IncludesSelectedAssertionsInGeneratedYaml()
     {
         var analyzer = new CurlCommandAnalyzer(new StubConfiguredTestSuiteProvider(new ApiTestSuiteDefinition

@@ -1,0 +1,40 @@
+targetEnvironments:
+- "AdvisorDashboard"
+endpoints:
+- name: "POST /GetAUMSummary"
+  method: "POST"
+  path: "/AumSummary/GetAumSummary"
+  headers:
+    accept: "text/plain"
+    Content-Type: "application/json"
+  query:
+    UserID: "{{var:userID}}"
+    RoleId: "{{var:roleId}}"
+    baseCurrency: "{{var:baseCurrency}}"
+    isOnlyGWMDB: "{{var:isOnlyGWMDB}}"
+  body:
+    currentPageNumber: "{{var:currentPageNumber}}"
+    recordsPerPage: "{{var:recordsPerPage}}"
+    filters:
+    - column: "ValuationMonth"
+      value: "{{var:valuationMonth}}"
+      filterType: "equal"
+    - column: "ValuationYear"
+      value: "{{var:valuationYear}}"
+      filterType: "equal"
+    - column: "userRoleID"
+      value: "{{var:userRoleID}}"
+      filterType: "equal"
+    searches: []
+    ranges: []
+    sort: "{{var:sort}}"
+    sortOrder: "{{var:sortOrder}}"
+  tests:
+  - name: "Has Data"
+    expectedStatus: 200
+    assertions:
+    - field: "statusCode"
+      equals: 1
+    - field: "data.pagenationTemplate.dataLists"
+      notEmpty: true
+...

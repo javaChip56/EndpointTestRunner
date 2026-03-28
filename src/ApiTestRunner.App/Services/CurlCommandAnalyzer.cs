@@ -986,54 +986,12 @@ public sealed class CurlCommandAnalyzer : ICurlCommandAnalyzer
 
     private static Dictionary<string, object?> BuildEnvironmentDocument(EnvironmentDefinition environment)
     {
-        return new Dictionary<string, object?>
-        {
-            ["name"] = environment.Name,
-            ["baseUrl"] = environment.BaseUrl,
-            ["variables"] = environment.Variables.Count == 0
-                ? null
-                : new Dictionary<string, object?>(environment.Variables, StringComparer.OrdinalIgnoreCase)
-        };
+        return YamlDefinitionFormatter.BuildEnvironmentDocument(environment);
     }
 
     private static Dictionary<string, object?> BuildEndpointDocument(EndpointDefinition endpoint)
     {
-        var document = new Dictionary<string, object?>
-        {
-            ["name"] = endpoint.Name,
-            ["method"] = endpoint.Method,
-            ["path"] = endpoint.Path
-        };
-
-        if (endpoint.PathParams.Count > 0)
-        {
-            document["pathParams"] = new Dictionary<string, object?>(endpoint.PathParams, StringComparer.OrdinalIgnoreCase);
-        }
-
-        if (endpoint.Query.Count > 0)
-        {
-            document["query"] = new Dictionary<string, object?>(endpoint.Query, StringComparer.OrdinalIgnoreCase);
-        }
-
-        if (endpoint.Headers.Count > 0)
-        {
-            document["headers"] = endpoint.Headers.ToDictionary(
-                pair => pair.Key,
-                pair => (object?)pair.Value,
-                StringComparer.OrdinalIgnoreCase);
-        }
-
-        if (endpoint.Body is not null)
-        {
-            document["body"] = endpoint.Body;
-        }
-
-        if (endpoint.Tests.Count > 0)
-        {
-            document["tests"] = endpoint.Tests.Select(BuildTestDocument).ToList();
-        }
-
-        return document;
+        return YamlDefinitionFormatter.BuildEndpointDocument(endpoint);
     }
 
     private static List<Dictionary<string, object?>> BuildTestDocuments(

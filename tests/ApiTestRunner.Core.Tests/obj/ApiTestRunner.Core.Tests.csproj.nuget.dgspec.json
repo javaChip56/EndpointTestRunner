@@ -1,24 +1,24 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Research\\EndpointTestRunner\\tests\\ApiTestRunner.Core.Tests\\ApiTestRunner.Core.Tests.csproj": {}
+    "D:\\Projects\\Research\\EndpointTestRunner\\tests\\ApiTestRunner.Core.Tests\\ApiTestRunner.Core.Tests.csproj": {}
   },
   "projects": {
-    "D:\\Research\\EndpointTestRunner\\src\\ApiTestRunner.Core\\ApiTestRunner.Core.csproj": {
+    "D:\\Projects\\Research\\EndpointTestRunner\\src\\ApiTestRunner.Core\\ApiTestRunner.Core.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Research\\EndpointTestRunner\\src\\ApiTestRunner.Core\\ApiTestRunner.Core.csproj",
+        "projectUniqueName": "D:\\Projects\\Research\\EndpointTestRunner\\src\\ApiTestRunner.Core\\ApiTestRunner.Core.csproj",
         "projectName": "ApiTestRunner.Core",
-        "projectPath": "D:\\Research\\EndpointTestRunner\\src\\ApiTestRunner.Core\\ApiTestRunner.Core.csproj",
-        "packagesPath": "C:\\Users\\Button\\.nuget\\packages\\",
-        "outputPath": "D:\\Research\\EndpointTestRunner\\src\\ApiTestRunner.Core\\obj\\",
+        "projectPath": "D:\\Projects\\Research\\EndpointTestRunner\\src\\ApiTestRunner.Core\\ApiTestRunner.Core.csproj",
+        "packagesPath": "C:\\Users\\gali\\.nuget\\packages\\",
+        "outputPath": "D:\\Projects\\Research\\EndpointTestRunner\\src\\ApiTestRunner.Core\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "D:\\Research\\EndpointTestRunner\\NuGet.Config",
-          "C:\\Users\\Button\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "D:\\Projects\\Research\\EndpointTestRunner\\NuGet.Config",
+          "C:\\Users\\gali\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -44,7 +44,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "9.0.100"
+        "SdkAnalysisLevel": "9.0.300"
       },
       "frameworks": {
         "net8.0": {
@@ -74,25 +74,25 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.102/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.311/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "D:\\Research\\EndpointTestRunner\\tests\\ApiTestRunner.Core.Tests\\ApiTestRunner.Core.Tests.csproj": {
+    "D:\\Projects\\Research\\EndpointTestRunner\\tests\\ApiTestRunner.Core.Tests\\ApiTestRunner.Core.Tests.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Research\\EndpointTestRunner\\tests\\ApiTestRunner.Core.Tests\\ApiTestRunner.Core.Tests.csproj",
+        "projectUniqueName": "D:\\Projects\\Research\\EndpointTestRunner\\tests\\ApiTestRunner.Core.Tests\\ApiTestRunner.Core.Tests.csproj",
         "projectName": "ApiTestRunner.Core.Tests",
-        "projectPath": "D:\\Research\\EndpointTestRunner\\tests\\ApiTestRunner.Core.Tests\\ApiTestRunner.Core.Tests.csproj",
-        "packagesPath": "C:\\Users\\Button\\.nuget\\packages\\",
-        "outputPath": "D:\\Research\\EndpointTestRunner\\tests\\ApiTestRunner.Core.Tests\\obj\\",
+        "projectPath": "D:\\Projects\\Research\\EndpointTestRunner\\tests\\ApiTestRunner.Core.Tests\\ApiTestRunner.Core.Tests.csproj",
+        "packagesPath": "C:\\Users\\gali\\.nuget\\packages\\",
+        "outputPath": "D:\\Projects\\Research\\EndpointTestRunner\\tests\\ApiTestRunner.Core.Tests\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "D:\\Research\\EndpointTestRunner\\NuGet.Config",
-          "C:\\Users\\Button\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "D:\\Projects\\Research\\EndpointTestRunner\\NuGet.Config",
+          "C:\\Users\\gali\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -106,8 +106,8 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "D:\\Research\\EndpointTestRunner\\src\\ApiTestRunner.Core\\ApiTestRunner.Core.csproj": {
-                "projectPath": "D:\\Research\\EndpointTestRunner\\src\\ApiTestRunner.Core\\ApiTestRunner.Core.csproj"
+              "D:\\Projects\\Research\\EndpointTestRunner\\src\\ApiTestRunner.Core\\ApiTestRunner.Core.csproj": {
+                "projectPath": "D:\\Projects\\Research\\EndpointTestRunner\\src\\ApiTestRunner.Core\\ApiTestRunner.Core.csproj"
               }
             }
           }
@@ -122,7 +122,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "9.0.100"
+        "SdkAnalysisLevel": "9.0.300"
       },
       "frameworks": {
         "net8.0": {
@@ -169,7 +169,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.102/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.311/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

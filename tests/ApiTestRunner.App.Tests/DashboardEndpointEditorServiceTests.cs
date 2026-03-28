@@ -1,6 +1,8 @@
 using ApiTestRunner.App.Models;
 using ApiTestRunner.App.Services;
 using ApiTestRunner.Core.Models;
+using ApiTestRunner.Core.Services;
+using Microsoft.Extensions.Configuration;
 
 namespace ApiTestRunner.App.Tests;
 
@@ -18,7 +20,7 @@ public sealed class DashboardEndpointEditorServiceTests : IDisposable
     public async Task GetEditorSeedAsync_ReturnsSourceFilePathAndEndpointName()
     {
         var (provider, environment, endpoint, _, endpointFilePath) = CreateProvider();
-        var service = new DashboardEndpointEditorService(provider);
+        var service = CreateService(provider);
 
         var seed = await service.GetEditorSeedAsync(
             DashboardSuiteManifestFactory.CreateEnvironmentId(environment),
@@ -90,7 +92,7 @@ public sealed class DashboardEndpointEditorServiceTests : IDisposable
             },
             [environmentFilePath, endpointFilePath]));
 
-        var service = new DashboardEndpointEditorService(provider);
+        var service = CreateService(provider);
 
         var seed = await service.GetEditorSeedAsync(
             DashboardSuiteManifestFactory.CreateEnvironmentId(environment),
@@ -105,7 +107,7 @@ public sealed class DashboardEndpointEditorServiceTests : IDisposable
     public async Task SaveAsync_UpdatesEndpointYamlFile()
     {
         var (provider, environment, endpoint, _, endpointFilePath) = CreateProvider();
-        var service = new DashboardEndpointEditorService(provider);
+        var service = CreateService(provider);
 
         var response = await service.SaveAsync(new DashboardEndpointSaveRequest
         {
@@ -204,7 +206,7 @@ public sealed class DashboardEndpointEditorServiceTests : IDisposable
             },
             [environmentFilePath, endpointFilePath]));
 
-        var service = new DashboardEndpointEditorService(provider);
+        var service = CreateService(provider);
 
         await service.SaveAsync(new DashboardEndpointSaveRequest
         {
@@ -226,6 +228,172 @@ public sealed class DashboardEndpointEditorServiceTests : IDisposable
 
         Assert.Contains("path: \"/sample-api/customers/{customerId}\"", savedYaml);
         Assert.DoesNotContain("%7BcustomerId%7D", savedYaml);
+    }
+
+    [Fact]
+    public async Task GetEditorSeedAsync_ResolvesEnvironmentVariablesInCurlCommand()
+    {
+        var environmentFilePath = Path.Combine(_tempDirectory, "resolved-environment.yaml");
+        var endpointFilePath = Path.Combine(_tempDirectory, "resolved-endpoint.yaml");
+
+        File.WriteAllText(environmentFilePath, """
+            environments:
+              - name: "Local"
+                baseUrl: "https://api.example.com"
+                variables:
+                  userId: "233083"
+                  roleId: "106"
+            """);
+
+        File.WriteAllText(endpointFilePath, """
+            targetEnvironments:
+              - "Local"
+            endpoints:
+              - name: "Get Account List"
+                method: "POST"
+                path: "/accounts"
+                query:
+                  UserId: "{{var:userId}}"
+                headers:
+                  X-Role: "{{var:roleId}}"
+                body:
+                  roleId: "{{var:roleId}}"
+                tests:
+                  - name: "Returns data"
+                    expectedStatus: 200
+            """);
+
+        var environment = new EnvironmentDefinition
+        {
+            Name = "Local",
+            BaseUrl = "https://api.example.com",
+            Variables = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["userId"] = "233083",
+                ["roleId"] = "106"
+            },
+            Endpoints =
+            [
+                new EndpointDefinition
+                {
+                    Name = "Get Account List",
+                    Method = "POST",
+                    Path = "/accounts",
+                    Query = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["UserId"] = "{{var:userId}}"
+                    },
+                    Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["X-Role"] = "{{var:roleId}}"
+                    },
+                    Body = new Dictionary<object, object?>
+                    {
+                        ["roleId"] = "{{var:roleId}}"
+                    },
+                    Tests =
+                    [
+                        new TestDefinition
+                        {
+                            Name = "Returns data",
+                            ExpectedStatus = 200
+                        }
+                    ]
+                }
+            ]
+        };
+
+        var provider = new StubConfiguredTestSuiteProvider(new LoadedTestSuite(
+            new ApiTestSuiteDefinition
+            {
+                Environments = [environment]
+            },
+            [environmentFilePath, endpointFilePath]));
+
+        var service = CreateService(provider);
+        var endpoint = environment.Endpoints[0];
+
+        var seed = await service.GetEditorSeedAsync(
+            DashboardSuiteManifestFactory.CreateEnvironmentId(environment),
+            DashboardSuiteManifestFactory.CreateEndpointId(environment, endpoint));
+
+        Assert.Contains("UserId=233083", seed.CurlCommand);
+        Assert.Contains("--header \"X-Role: 106\"", seed.CurlCommand);
+        Assert.Contains("\\\"roleId\\\":\\\"106\\\"", seed.CurlCommand);
+        Assert.DoesNotContain("{{var:userId}}", seed.CurlCommand);
+        Assert.DoesNotContain("{{var:roleId}}", seed.CurlCommand);
+    }
+
+    [Fact]
+    public async Task GetEditorSeedAsync_NormalizesPairListBodyShapeIntoJsonObject()
+    {
+        var environmentFilePath = Path.Combine(_tempDirectory, "pairlist-environment.yaml");
+        var endpointFilePath = Path.Combine(_tempDirectory, "pairlist-endpoint.yaml");
+
+        File.WriteAllText(environmentFilePath, """
+            environments:
+              - name: "Local"
+                baseUrl: "https://api.example.com"
+            """);
+
+        File.WriteAllText(endpointFilePath, """
+            targetEnvironments:
+              - "Local"
+            endpoints:
+              - name: "Get Pair List"
+                method: "POST"
+                path: "/pair-list"
+                body:
+                  filters: []
+                  ranges: []
+                tests:
+                  - name: "Returns data"
+                    expectedStatus: 200
+            """);
+
+        var endpoint = new EndpointDefinition
+        {
+            Name = "Get Pair List",
+            Method = "POST",
+            Path = "/pair-list",
+            Body = new object?[]
+            {
+                new object?[] { "filters", new List<object?>() },
+                new object?[] { "ranges", new List<object?>() }
+            },
+            Tests =
+            [
+                new TestDefinition
+                {
+                    Name = "Returns data",
+                    ExpectedStatus = 200
+                }
+            ]
+        };
+
+        var environment = new EnvironmentDefinition
+        {
+            Name = "Local",
+            BaseUrl = "https://api.example.com",
+            Endpoints = [endpoint]
+        };
+
+        var provider = new StubConfiguredTestSuiteProvider(new LoadedTestSuite(
+            new ApiTestSuiteDefinition
+            {
+                Environments = [environment]
+            },
+            [environmentFilePath, endpointFilePath]));
+
+        var service = CreateService(provider);
+
+        var seed = await service.GetEditorSeedAsync(
+            DashboardSuiteManifestFactory.CreateEnvironmentId(environment),
+            DashboardSuiteManifestFactory.CreateEndpointId(environment, endpoint));
+
+        Assert.Contains("\\\"filters\\\":[]", seed.CurlCommand);
+        Assert.Contains("\\\"ranges\\\":[]", seed.CurlCommand);
+        Assert.DoesNotContain("System.Collections.Generic.List", seed.CurlCommand);
     }
 
     public void Dispose()
@@ -304,5 +472,14 @@ public sealed class DashboardEndpointEditorServiceTests : IDisposable
         {
             return Task.FromResult(_loadedSuite);
         }
+    }
+
+    private static DashboardEndpointEditorService CreateService(IConfiguredTestSuiteProvider provider)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection()
+            .Build();
+        var variableResolver = new VariableResolver(configuration, TimeProvider.System);
+        return new DashboardEndpointEditorService(provider, variableResolver);
     }
 }

@@ -1,4 +1,0 @@
-environments:
-- name: "PetstoreSwaggerIo"
-  baseUrl: "https://petstore.swagger.io"
-...
