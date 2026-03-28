@@ -18,6 +18,9 @@ const assertionValueContainer = document.getElementById("assertionValueContainer
 const assertionList = document.getElementById("assertionList");
 const analysisContainer = document.getElementById("analysisContainer");
 const saveEndpointButton = document.getElementById("saveEndpointButton");
+const curlEditorGuide = document.getElementById("curlEditorGuide");
+const testBuilderStatus = document.getElementById("testBuilderStatus");
+const assertionBuilderStatus = document.getElementById("assertionBuilderStatus");
 
 const assertionRuleDefinitions = {
     equals: { label: "equals", valueMode: "typed" },
@@ -61,6 +64,12 @@ let currentAssertionEditIndex = null;
 let currentAssertionEditTestId = null;
 
 async function analyzeCurlCommand() {
+    if (isEditingAssertion()) {
+        renderStatus("Save or cancel the inline assertion edit before analyzing.", true);
+        renderResponseStatus("Save or cancel the inline assertion edit before analyzing.", true);
+        return;
+    }
+
     const command = curlInput.value.trim();
     if (!command) {
         renderStatus("Paste a cURL command first.", true);
@@ -168,7 +177,7 @@ function applyEditorSeed(seed) {
     currentTestDraftId = testDrafts[0]?.id ?? null;
     analysisContainer.innerHTML = "";
     renderAssertionBuilder(null);
-    renderResponseStatus("Paste a response body if you want to edit assertions by field picker.", false);
+    renderResponseStatus("Paste a response body to unlock field-based assertion drafting.", false);
     updateSaveButtonState();
 }
 
@@ -187,6 +196,12 @@ function buildAnalyzePayloadTests() {
 async function saveEditedEndpoint() {
     if (!editorContext) {
         renderStatus("Open an existing endpoint from the dashboard before saving.", true);
+        return;
+    }
+
+    if (isEditingAssertion()) {
+        renderStatus("Save or cancel the inline assertion edit before saving.", true);
+        renderResponseStatus("Save or cancel the inline assertion edit before saving.", true);
         return;
     }
 
@@ -224,6 +239,7 @@ async function saveEditedEndpoint() {
 
         const result = await response.json();
         editorContext = {
+            environmentName: editorContext.environmentName,
             environmentId: result.environmentId,
             endpointId: result.endpointId,
             sourceFilePath: result.filePath
@@ -258,7 +274,7 @@ function parseResponseBody() {
         parsedResponseObject = null;
         lastParsedResponseBody = "";
         renderAssertionBuilder();
-        renderResponseStatus("No response body parsed yet.", false);
+        renderResponseStatus("No response body parsed yet. Paste JSON to unlock the field picker.", false);
         return;
     }
 
@@ -355,6 +371,7 @@ function renderAssertionBuilder(editorState = undefined) {
     renderFieldOptions();
     restoreAssertionBuilderState(nextEditorState);
     renderAssertionDrafts();
+    updateEditorWorkflowState();
     updateAssertionActionButtons();
 }
 
@@ -389,6 +406,7 @@ function getCurrentTestDraft() {
 
 function renderTestDraftList() {
     testDraftList.innerHTML = "";
+    const inlineEditActive = isEditingAssertion();
 
     if (testDrafts.length === 0) {
         testDraftList.innerHTML = "<p class=\"result-note\">No tests drafted yet.</p>";
@@ -418,7 +436,8 @@ function renderTestDraftList() {
         const editButton = document.createElement("button");
         editButton.type = "button";
         editButton.className = `btn btn-sm ${draft.id === currentTestDraftId ? "btn-primary is-active" : "btn-default"}`;
-        editButton.textContent = draft.id === currentTestDraftId ? "Editing" : "Edit";
+        editButton.textContent = draft.id === currentTestDraftId ? "Selected" : "Edit";
+        editButton.disabled = inlineEditActive;
         editButton.addEventListener("click", () => {
             currentTestDraftId = draft.id;
             resetAssertionEditState();
@@ -429,6 +448,7 @@ function renderTestDraftList() {
         removeButton.type = "button";
         removeButton.className = "btn btn-default btn-sm";
         removeButton.textContent = "Remove";
+        removeButton.disabled = inlineEditActive;
         removeButton.addEventListener("click", () => removeTestDraft(draft.id));
 
         actions.appendChild(editButton);
@@ -599,10 +619,29 @@ function resetAssertionEditState() {
 }
 
 function updateAssertionActionButtons() {
-    const canEditAssertions = parsedResponseFields.length > 0 && Boolean(getCurrentTestDraft()) && busyAction === null;
     const isEditing = isEditingAssertion();
+    const canAddAssertions = parsedResponseFields.length > 0 &&
+        Boolean(getCurrentTestDraft()) &&
+        busyAction === null &&
+        !isEditing;
 
-    addAssertionButton.disabled = !canEditAssertions || isEditing;
+    addAssertionButton.disabled = !canAddAssertions;
+
+    if (busyAction !== null) {
+        addAssertionButton.innerHTML = "<i class=\"fa-solid fa-plus button-icon\"></i>Add Assertion";
+        return;
+    }
+
+    if (isEditing) {
+        addAssertionButton.innerHTML = "<i class=\"fa-solid fa-pen-to-square button-icon\"></i>Finish Inline Edit Below";
+        return;
+    }
+
+    if (parsedResponseFields.length === 0) {
+        addAssertionButton.innerHTML = "<i class=\"fa-solid fa-code button-icon\"></i>Parse Response Body First";
+        return;
+    }
+
     addAssertionButton.innerHTML = "<i class=\"fa-solid fa-plus button-icon\"></i>Add Assertion";
 }
 
@@ -1124,7 +1163,7 @@ function renderAssertionDrafts() {
     const currentDraft = getCurrentTestDraft();
 
     if (!currentDraft || currentDraft.assertions.length === 0) {
-        assertionList.innerHTML = "<p class=\"result-note\">No assertion rules added for this test yet.</p>";
+        assertionList.innerHTML = "<p class=\"result-note\">No assertion rules added for this test yet. Use the builder above once a response body has been parsed.</p>";
         return;
     }
 
@@ -1133,11 +1172,21 @@ function renderAssertionDrafts() {
         item.className = "assertion-draft-item card card-outline card-light";
 
         if (isEditingAssertion() && currentAssertionEditIndex === index) {
+            item.classList.add("is-editing");
             item.appendChild(createInlineAssertionEditor(draft, index));
         } else {
+            const content = document.createElement("div");
+            content.className = "assertion-draft-copy";
+
+            const label = document.createElement("span");
+            label.className = "draft-pill";
+            label.textContent = `Assertion ${index + 1}`;
+
             const text = document.createElement("span");
             text.className = "assertion-draft-text";
             text.textContent = `${draft.field} -> ${draft.rule}: ${formatSample(draft.value)}`;
+            content.appendChild(label);
+            content.appendChild(text);
 
             const actions = document.createElement("div");
             actions.className = "test-draft-actions";
@@ -1164,7 +1213,7 @@ function renderAssertionDrafts() {
 
             actions.appendChild(editButton);
             actions.appendChild(removeButton);
-            item.appendChild(text);
+            item.appendChild(content);
             item.appendChild(actions);
         }
 
@@ -1304,7 +1353,8 @@ function startAssertionEdit(index) {
     currentAssertionEditIndex = index;
     currentAssertionEditTestId = currentDraft.id;
     renderAssertionBuilder(captureAssertionBuilderState());
-    renderResponseStatus("Editing assertion inline. Save or cancel from the assertion row.", false);
+    renderStatus("Inline assertion edit is active. Finish that row before generating YAML.", false);
+    renderResponseStatus("Editing assertion inline. Save or cancel from the assertion row below.", false);
 }
 
 function cancelAssertionEdit() {
@@ -1314,6 +1364,7 @@ function cancelAssertionEdit() {
 
     resetAssertionEditState();
     renderAssertionBuilder(captureAssertionBuilderState());
+    renderStatus("Inline assertion edit cancelled.", false);
     renderResponseStatus("Assertion edit cancelled.", false);
 }
 
@@ -2041,22 +2092,145 @@ function renderResponseStatus(message, isError) {
 
 function setBusy(isBusy, action = null) {
     busyAction = isBusy ? action : null;
-    analyzeButton.disabled = isBusy;
-    saveEndpointButton.disabled = isBusy || !editorContext;
-    addTestButton.disabled = isBusy;
+    analyzeButton.innerHTML = isBusy
+        ? "<i class=\"fa-solid fa-spinner fa-spin button-icon\"></i>Analyzing..."
+        : "<i class=\"fa-solid fa-wand-magic-sparkles button-icon\"></i>Analyze Request and Generate YAML";
+    saveEndpointButton.innerHTML = busyAction === "save"
+        ? "<i class=\"fa-solid fa-spinner fa-spin button-icon\"></i>Saving..."
+        : "<i class=\"fa-solid fa-floppy-disk button-icon\"></i>Save Changes to Endpoint YAML";
+    updateSaveButtonState();
+    updatePrimaryActionState();
+    updateAssertionActionButtons();
+}
+
+function updateEditorWorkflowState() {
+    renderCurlEditorGuide();
+    renderTestBuilderStatus();
+    renderAssertionBuilderStatus();
+    updatePrimaryActionState();
+}
+
+function renderCurlEditorGuide() {
+    if (!curlEditorGuide) {
+        return;
+    }
+
+    if (editorContext?.environmentName) {
+        curlEditorGuide.textContent = `Editing an existing endpoint from ${editorContext.environmentName}. Analyze to refresh the YAML previews, then use Save Changes to write back to the source file.`;
+        return;
+    }
+
+    curlEditorGuide.textContent = "Creating a new draft from cURL. Analyze after you review the endpoint name, then copy the suggested YAML from the results below.";
+}
+
+function renderTestBuilderStatus() {
+    if (!testBuilderStatus) {
+        return;
+    }
+
+    const currentDraft = getCurrentTestDraft();
+    if (!currentDraft) {
+        testBuilderStatus.innerHTML = "";
+        return;
+    }
+
+    const testNumber = getCurrentTestDraftNumber();
+    const draftName = currentDraft.name.trim() || `Test ${testNumber}`;
+    const assertionCount = currentDraft.assertions.length;
+    const message = isEditingAssertion()
+        ? `Test ${testNumber} of ${testDrafts.length} is selected. ${assertionCount} assertions are drafted. Finish the inline assertion edit below before switching tests or generating YAML.`
+        : parsedResponseFields.length === 0
+            ? `Test ${testNumber} of ${testDrafts.length} is selected. ${assertionCount} assertions are drafted. Paste a JSON response body in Step 2 to unlock the field picker.`
+            : `Test ${testNumber} of ${testDrafts.length} is selected. ${assertionCount} assertions are drafted and new assertions will be added to this test.`;
+
+    renderGuidancePanel(testBuilderStatus, draftName, message, isEditingAssertion() ? "warning" : "info");
+}
+
+function renderAssertionBuilderStatus() {
+    if (!assertionBuilderStatus) {
+        return;
+    }
+
+    const currentDraft = getCurrentTestDraft();
+    if (!currentDraft) {
+        assertionBuilderStatus.innerHTML = "";
+        return;
+    }
+
+    if (parsedResponseFields.length === 0) {
+        renderGuidancePanel(
+            assertionBuilderStatus,
+            "Field picker locked",
+            "Paste a valid JSON response body in Step 2 and leave the field once so the app can detect selectable fields for assertions.",
+            "warning");
+        return;
+    }
+
+    if (isEditingAssertion()) {
+        renderGuidancePanel(
+            assertionBuilderStatus,
+            `Editing assertion ${currentAssertionEditIndex + 1}`,
+            "This row is in inline edit mode. Save or cancel it below before analyzing, saving, or switching to another test.",
+            "warning");
+        return;
+    }
+
+    const draftName = currentDraft.name.trim() || `Test ${getCurrentTestDraftNumber()}`;
+    renderGuidancePanel(
+        assertionBuilderStatus,
+        `Adding to ${draftName}`,
+        "Use this builder to add a brand new assertion. Existing assertions remain below and can be edited inline from their own rows.",
+        "info");
+}
+
+function renderGuidancePanel(container, title, message, tone) {
+    if (!container.dataset.layoutClasses) {
+        container.dataset.layoutClasses = Array.from(container.classList)
+            .filter((className) => /^m[trblxy]?-\d+$/.test(className))
+            .join(" ");
+    }
+
+    container.className = `editor-guidance-panel editor-guidance-panel-${tone}${container.dataset.layoutClasses ? ` ${container.dataset.layoutClasses}` : ""}`;
+    container.innerHTML = `
+        <strong class="editor-guidance-title">${escapeHtml(title)}</strong>
+        <span class="editor-guidance-copy">${escapeHtml(message)}</span>
+    `;
+}
+
+function getCurrentTestDraftNumber() {
+    const currentDraft = getCurrentTestDraft();
+    if (!currentDraft) {
+        return 1;
+    }
+
+    const index = testDrafts.findIndex((draft) => draft.id === currentDraft.id);
+    return index >= 0 ? index + 1 : 1;
+}
+
+function updatePrimaryActionState() {
+    const isBusy = busyAction !== null;
+    const hasInlineEdit = isEditingAssertion();
+
+    analyzeButton.disabled = isBusy || hasInlineEdit;
+    addTestButton.disabled = isBusy || hasInlineEdit;
     endpointNameInput.disabled = isBusy;
     testNameInput.disabled = isBusy;
     expectedStatusInput.disabled = isBusy;
     formatResponseButton.disabled = isBusy;
     toggleResponseWrapButton.disabled = isBusy;
-    analyzeButton.innerHTML = isBusy
-        ? "<i class=\"fa-solid fa-spinner fa-spin button-icon\"></i>Analyzing..."
-        : "<i class=\"fa-solid fa-wand-magic-sparkles button-icon\"></i>Analyze and Generate";
-    saveEndpointButton.innerHTML = busyAction === "save"
-        ? "<i class=\"fa-solid fa-spinner fa-spin button-icon\"></i>Saving..."
-        : "<i class=\"fa-solid fa-floppy-disk button-icon\"></i>Save Endpoint YAML";
-    updateSaveButtonState();
-    updateAssertionActionButtons();
+    saveEndpointButton.disabled = isBusy || !editorContext || hasInlineEdit;
+
+    if (isBusy) {
+        return;
+    }
+
+    analyzeButton.innerHTML = hasInlineEdit
+        ? "<i class=\"fa-solid fa-pen-to-square button-icon\"></i>Finish Inline Edit Before Analyze"
+        : "<i class=\"fa-solid fa-wand-magic-sparkles button-icon\"></i>Analyze Request and Generate YAML";
+
+    saveEndpointButton.innerHTML = hasInlineEdit
+        ? "<i class=\"fa-solid fa-pen-to-square button-icon\"></i>Finish Inline Edit Before Save"
+        : "<i class=\"fa-solid fa-floppy-disk button-icon\"></i>Save Changes to Endpoint YAML";
 }
 
 async function buildErrorMessage(response, fallbackMessage) {
@@ -2077,7 +2251,7 @@ async function buildErrorMessage(response, fallbackMessage) {
 }
 
 function escapeHtml(value) {
-    return value
+    return String(value ?? "")
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;");
@@ -2096,6 +2270,7 @@ function updateCurrentTestDraft(mutator) {
 
     mutator(currentDraft);
     renderTestDraftList();
+    updateEditorWorkflowState();
 }
 
 assertionFieldSelect.addEventListener("change", () => {
@@ -2135,4 +2310,5 @@ responseBodyInput.addEventListener("blur", parseResponseBody);
 
 renderAssertionBuilder();
 updateSaveButtonState();
+updateEditorWorkflowState();
 loadEditorSeedFromQuery();

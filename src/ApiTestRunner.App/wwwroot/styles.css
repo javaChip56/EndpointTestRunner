@@ -54,7 +54,8 @@ body.app-shell {
 .panel-note,
 .result-summary,
 .result-note,
-.helper-text {
+.helper-text,
+.editor-guidance-copy {
     color: #667085;
 }
 
@@ -209,6 +210,20 @@ body.app-shell {
     gap: 0.55rem;
     font-size: 1.15rem;
     font-weight: 700;
+}
+
+.workflow-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.12);
+    color: var(--app-accent-strong);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .panel-title-icon {
@@ -672,6 +687,41 @@ body.app-shell {
     font-size: 0.88rem;
 }
 
+.editor-guidance-panel {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.85rem 1rem;
+    border-radius: 0.95rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(248, 250, 252, 0.92);
+}
+
+.editor-guidance-panel-warning {
+    border-color: rgba(181, 71, 8, 0.18);
+    background: rgba(255, 247, 237, 0.95);
+}
+
+.editor-guidance-title,
+.editor-section-label {
+    color: #344054;
+    font-weight: 700;
+}
+
+.editor-guidance-title {
+    font-size: 0.93rem;
+}
+
+.editor-guidance-copy {
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.editor-section-label {
+    font-size: 0.82rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
 .assertion-builder-grid {
     display: grid;
     gap: 1rem;
@@ -713,11 +763,37 @@ body.app-shell {
     text-align: left;
 }
 
+.assertion-draft-item.is-editing {
+    border-color: rgba(15, 118, 110, 0.26);
+    box-shadow: 0 16px 34px rgba(15, 118, 110, 0.12);
+}
+
+.assertion-draft-copy {
+    display: grid;
+    gap: 0.45rem;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
 .assertion-draft-text {
     flex: 1 1 auto;
     min-width: 0;
     text-align: left;
     word-break: break-word;
+}
+
+.draft-pill {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.1);
+    color: var(--app-accent-strong);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
 .assertion-inline-editor {

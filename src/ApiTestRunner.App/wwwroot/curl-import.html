@@ -78,8 +78,9 @@
                                 <div class="card-header">
                                     <div class="tool-header">
                                         <div>
+                                            <span class="workflow-badge">Step 1</span>
                                             <h2 class="panel-title"><i class="fa-solid fa-terminal panel-title-icon"></i>Paste cURL command</h2>
-                                            <p class="panel-note mb-0">Paste the request first. The main action below will analyze it and use the optional response body for assertion-driven endpoint YAML.</p>
+                                            <p class="panel-note mb-0">Start with the request. The app will parse it, compare it to the loaded suite, and then generate YAML suggestions from the request plus any drafted tests.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -91,6 +92,7 @@
                                             <input id="endpointNameInput" class="form-control tool-input-inline" type="text" placeholder="POST GetAccountList" />
                                         </label>
                                     </div>
+                                    <p id="curlEditorGuide" class="editor-guidance-copy mb-0 mt-3"></p>
                                 </div>
                             </section>
                         </div>
@@ -100,8 +102,9 @@
                                 <div class="card-header">
                                     <div class="tool-header">
                                         <div>
+                                            <span class="workflow-badge">Step 2</span>
                                             <h2 class="panel-title"><i class="fa-solid fa-code panel-title-icon"></i>Paste response body</h2>
-                                            <p class="panel-note mb-0">Optional. Paste a JSON response body and the app will parse it automatically when you leave the field or run the generator.</p>
+                                            <p class="panel-note mb-0">Optional, but recommended if you want to draft assertions from a field picker instead of typing raw YAML rules by hand.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -121,12 +124,14 @@
                                 <div class="card-header">
                                     <div class="tool-header">
                                         <div>
+                                            <span class="workflow-badge">Step 3</span>
                                             <h2 class="panel-title"><i class="fa-solid fa-list-ul panel-title-icon"></i>Test builder</h2>
-                                            <p class="panel-note mb-0">Create one or more tests, each with its own expected status and assertions, then generate endpoint YAML with all drafted tests included.</p>
+                                            <p class="panel-note mb-0">Build the tests that should be saved into endpoint YAML. Pick a test, add assertions to that test, and edit existing assertions inline when needed.</p>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="card-body">
+                                    <div id="testBuilderStatus" class="editor-guidance-panel mb-3"></div>
                                     <div id="testBuilderGrid" class="assertion-builder-grid">
                                         <label class="field-stack">
                                             <span>Test name</span>
@@ -139,11 +144,14 @@
                                     </div>
 
                                     <div class="tool-actions mt-3">
-                                        <button id="addTestButton" class="btn btn-default" type="button"><i class="fa-solid fa-file-circle-plus button-icon"></i>Add Another Test</button>
+                                        <button id="addTestButton" class="btn btn-default" type="button"><i class="fa-solid fa-file-circle-plus button-icon"></i>Add Test</button>
                                     </div>
 
+                                    <p class="editor-section-label mt-4 mb-2">Drafted tests</p>
                                     <div id="testDraftList" class="test-draft-list"></div>
 
+                                    <div id="assertionBuilderStatus" class="editor-guidance-panel mt-4 mb-3"></div>
+                                    <p class="editor-section-label mb-2">Assertion builder</p>
                                     <div id="assertionBuilderGrid" class="assertion-builder-grid">
                                         <label class="field-stack">
                                             <span>Field</span>
@@ -163,6 +171,7 @@
                                         <button id="addAssertionButton" class="btn btn-default" type="button"><i class="fa-solid fa-plus button-icon"></i>Add Assertion</button>
                                     </div>
 
+                                    <p class="editor-section-label mt-4 mb-2">Assertions for selected test</p>
                                     <div id="assertionList" class="assertion-draft-list">
                                         <p class="result-note mb-0">No assertion rules added yet.</p>
                                     </div>
@@ -174,8 +183,8 @@
                             <section class="card card-outline card-secondary tool-panel">
                                 <div class="card-body">
                                     <div class="tool-actions">
-                                        <button id="analyzeButton" class="btn btn-primary elevation-2" type="button"><i class="fa-solid fa-wand-magic-sparkles button-icon"></i>Analyze and Generate</button>
-                                        <button id="saveEndpointButton" class="btn btn-default" type="button"><i class="fa-solid fa-floppy-disk button-icon"></i>Save Endpoint YAML</button>
+                                        <button id="analyzeButton" class="btn btn-primary elevation-2" type="button"><i class="fa-solid fa-wand-magic-sparkles button-icon"></i>Analyze Request and Generate YAML</button>
+                                        <button id="saveEndpointButton" class="btn btn-default" type="button"><i class="fa-solid fa-floppy-disk button-icon"></i>Save Changes to Endpoint YAML</button>
                                         <span id="analyzeStatus" class="result-summary">Waiting for input.</span>
                                     </div>
                                 </div>
